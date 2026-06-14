@@ -1,20 +1,28 @@
 <template>
-  <div
-    class="flex gap-2 max-w-[85%]"
-    :class="direction === 'outbound' ? 'flex-row-reverse' : 'flex-row'"
-  >
-    <img
-      :src="message.sender.image"
-      :alt="message.sender.name"
-      class="w-6 h-6 rounded-full object-cover shrink-0 mt-1"
-    />
-
+  <div class="group relative">
     <div
-      class="rounded-2xl px-3.5 py-2.5 min-w-0"
-      :class="direction === 'outbound'
-        ? 'bg-accent text-white rounded-br-sm'
-        : 'bg-surface text-text-primary border border-border rounded-bl-sm'"
+      class="flex gap-2 max-w-[85%]"
+      :class="direction === 'outbound' ? 'flex-row-reverse' : 'flex-row'"
     >
+      <img
+        :src="message.sender.image"
+        :alt="message.sender.name"
+        class="w-6 h-6 rounded-full object-cover shrink-0 mt-1"
+      />
+
+      <div
+        class="rounded-2xl px-3.5 py-2.5 min-w-0 relative"
+        :class="direction === 'outbound'
+          ? 'bg-accent text-white rounded-br-sm'
+          : 'bg-surface text-text-primary border border-border rounded-bl-sm'"
+      >
+        <button
+          ref="menuBtnRef"
+          class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 w-6 h-6 rounded-full bg-white border border-border flex items-center justify-center shadow-sm transition-opacity z-10 cursor-pointer"
+          @click.stop="toggleMenu"
+        >
+          <UIcon name="ph-dots-three-vertical" class="w-3 h-3 text-text-secondary" />
+        </button>
       <div v-if="message.file" class="mb-2">
         <div v-if="isImageFile(message.file_extension)" class="relative group -mx-1 -mt-1">
           <img
@@ -179,6 +187,24 @@
         />
       </div>
     </div>
+    </div>
+    <teleport to="body">
+      <div v-if="showMenu" class="fixed inset-0 z-40" @click="showMenu = false" />
+      <div
+        v-if="showMenu"
+        class="fixed z-50 bg-white rounded-xl shadow-xl border border-border py-1 w-32"
+        :style="{ top: menuPosition.top + 'px', right: menuPosition.right + 'px' }"
+        @click.stop
+      >
+        <button
+          class="flex items-center gap-2 w-full px-3 py-2 text-sm text-danger hover:bg-red-50 transition-colors cursor-pointer"
+          @click="emitDelete"
+        >
+          <UIcon name="ph-trash" class="w-4 h-4" />
+          Delete
+        </button>
+      </div>
+    </teleport>
   </div>
 </template>
 
@@ -197,12 +223,33 @@ interface Emits {
   (e: "file-preview", fileUrl: string, fileExt: string | undefined): void;
   (e: "file-download", fileUrl: string, fileName: string): void;
   (e: "retry-send-message", message: ChatMessage): void;
+  (e: "delete-message", message: ChatMessage): void;
 }
 
 const props = defineProps<Props>();
 const messageStatus = computed(() => props.status);
 const messageProgress = computed(() => props.progress);
 const emit = defineEmits<Emits>();
+
+const showMenu = ref(false);
+const menuBtnRef = ref<HTMLElement | null>(null);
+const menuPosition = ref({ top: 0, right: 0 });
+
+function toggleMenu() {
+  showMenu.value = !showMenu.value;
+  if (showMenu.value && menuBtnRef.value) {
+    const rect = menuBtnRef.value.getBoundingClientRect();
+    menuPosition.value = {
+      top: rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    };
+  }
+}
+
+function emitDelete() {
+  showMenu.value = false;
+  emit("delete-message", props.message);
+}
 
 const audioPlayer = ref<HTMLAudioElement | null>(null);
 const currentTime = ref("0:00");

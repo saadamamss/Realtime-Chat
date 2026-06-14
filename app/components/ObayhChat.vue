@@ -45,6 +45,7 @@
               @file-preview="openFilePreview"
               @file-download="downloadFile"
               @retry-send-message="retrySendMessage"
+              @delete-message="openDeleteDialog"
               :status="(pendingMessages[message.rId]?.status as 'sending' | 'sent' | 'failed') || message.status || 'sent'"
               :progress="pendingMessages[message.rId]?.progress || 0"
               :cancelTokenSource="pendingMessages[message.rId]?.cancelTokenSource || null"
@@ -172,6 +173,37 @@
         </button>
       </div>
     </div>
+    <teleport to="body">
+      <div v-if="showDeleteDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click="showDeleteDialog = false">
+        <div class="bg-white rounded-2xl p-6 w-80 shadow-2xl" @click.stop>
+          <h3 class="text-lg font-semibold text-text-primary mb-4">Delete Message?</h3>
+          <div class="flex flex-col gap-2 mb-4">
+            <label class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+              <input type="radio" v-model="deleteMode" value="me" class="accent-blue-600" />
+              <span class="text-sm text-text-primary">Delete for me</span>
+            </label>
+            <label v-if="canDeleteForAll" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+              <input type="radio" v-model="deleteMode" value="all" class="accent-blue-600" />
+              <span class="text-sm text-text-primary">Delete for all</span>
+            </label>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button
+              @click="showDeleteDialog = false"
+              class="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              @click="confirmDelete"
+              class="px-4 py-2 text-sm font-medium text-white bg-danger hover:bg-danger/90 rounded-lg transition-colors cursor-pointer"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </teleport>
   </div>
 </template>
 
@@ -204,6 +236,11 @@ const hasMoreOldMessages = ref(false)
 const chatCurrentPage = ref(1)
 const scrollPositionBeforeLoad = ref(0)
 
+const showDeleteDialog = ref(false)
+const deleteTargetMessage = ref<ChatMessage | null>(null)
+const deleteMode = ref<'me' | 'all'>('me')
+const canDeleteForAll = computed(() => deleteTargetMessage.value?.sender.id === $auth.currentUser?.id)
+
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
 let mediaRecorder: MediaRecorder | null = null
@@ -221,6 +258,10 @@ const sortedDates = computed(() => {
 })
 
 function handleIncomingMessage(data: any) {
+  if (data.type === 'message-deleted' && data.message_id) {
+    removeMessageFromChatData(data.message_id)
+    return
+  }
   if (data.type === 'new-message' && data.message) {
     const msg = data.message
     const date = new Date(msg.created_at).toISOString().split('T')[0] as string
@@ -305,6 +346,52 @@ function scrollToBottom() {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
   })
+}
+
+function openDeleteDialog(message: ChatMessage) {
+  deleteTargetMessage.value = message
+  deleteMode.value = message.sender.id === $auth.currentUser?.id ? 'all' : 'me'
+  showDeleteDialog.value = true
+}
+
+async function confirmDelete() {
+  if (!deleteTargetMessage.value) return
+  const msg = deleteTargetMessage.value
+  try {
+    await $axios.post('/messages/delete', {
+      message_id: msg.rId,
+      mode: deleteMode.value,
+    })
+    for (const date of Object.keys(chatData.value)) {
+      const arr = chatData.value[date]
+      if (arr) {
+        const idx = arr.findIndex((m) => m.rId === msg.rId)
+        if (idx !== -1) {
+          arr.splice(idx, 1)
+          if (arr.length === 0) delete chatData.value[date]
+          break
+        }
+      }
+    }
+    showDeleteDialog.value = false
+    deleteTargetMessage.value = null
+  } catch {
+    obayhToast.error({ title: 'Failed to delete message' })
+  }
+}
+
+function removeMessageFromChatData(messageId: string) {
+  for (const date of Object.keys(chatData.value)) {
+    const arr = chatData.value[date]
+    if (arr) {
+      const idx = arr.findIndex((m) => m.rId === messageId)
+      if (idx !== -1) {
+        arr.splice(idx, 1)
+        if (arr.length === 0) delete chatData.value[date]
+        break
+      }
+    }
+  }
 }
 
 function triggerFileInput(type: 'document' | 'media' | 'audio') {
@@ -553,6 +640,7 @@ watch(messagesContainer, () => {
 })
 
 onUnmounted(() => {
+  $ws.offMessage(handleIncomingMessage)
   if (props.conversationId) {
     $ws.leaveConversation(props.conversationId)
   }

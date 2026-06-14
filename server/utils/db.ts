@@ -67,6 +67,15 @@ function initSchema() {
       FOREIGN KEY (conversation_id) REFERENCES conversations(id)
     );
 
+    CREATE TABLE IF NOT EXISTS message_deletions (
+      message_rId TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (message_rId, user_id),
+      FOREIGN KEY (message_rId) REFERENCES messages(rId),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_rId ON messages(rId);
     CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone_number);
@@ -76,6 +85,7 @@ function initSchema() {
   migrateV2()
   migrateV3()
   migrateV4()
+  migrateV5()
   seedUsers()
 }
 
@@ -104,6 +114,22 @@ function migrateV4() {
   const cols = db.prepare("PRAGMA table_info('conversation_participants')").all() as any[]
   if (!cols.some((c: any) => c.name === 'deleted_at')) {
     db.exec("ALTER TABLE conversation_participants ADD COLUMN deleted_at TEXT")
+  }
+}
+
+function migrateV5() {
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='message_deletions'").all() as any[]
+  if (tables.length === 0) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS message_deletions (
+        message_rId TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (message_rId, user_id),
+        FOREIGN KEY (message_rId) REFERENCES messages(rId),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `)
   }
 }
 
@@ -217,19 +243,23 @@ export function getMessages(conversationId: string, userId: string, page: number
     FROM messages m
     JOIN users u ON m.sender_id = u.id
     LEFT JOIN conversation_participants cp ON cp.conversation_id = m.conversation_id AND cp.user_id = ?
+    LEFT JOIN message_deletions md ON md.message_rId = m.rId AND md.user_id = ?
     WHERE m.conversation_id = ?
       AND (cp.deleted_at IS NULL OR m.created_at > cp.deleted_at)
+      AND md.user_id IS NULL
     ORDER BY m.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(userId, conversationId, perPage, offset) as any[]
+  `).all(userId, userId, conversationId, perPage, offset) as any[]
 
   const total = (db.prepare(`
     SELECT COUNT(*) as count
     FROM messages m
     LEFT JOIN conversation_participants cp ON cp.conversation_id = m.conversation_id AND cp.user_id = ?
+    LEFT JOIN message_deletions md ON md.message_rId = m.rId AND md.user_id = ?
     WHERE m.conversation_id = ?
       AND (cp.deleted_at IS NULL OR m.created_at > cp.deleted_at)
-  `).get(userId, conversationId) as any).count
+      AND md.user_id IS NULL
+  `).get(userId, userId, conversationId) as any).count
   const lastPage = Math.ceil(total / perPage)
 
   const grouped: Record<string, any[]> = {}
@@ -255,6 +285,21 @@ export function isParticipant(conversationId: string, userId: string) {
 export function wipeConversation(conversationId: string, userId: string) {
   const db = getDb()
   db.prepare("UPDATE conversation_participants SET deleted_at = datetime('now') WHERE conversation_id = ? AND user_id = ?").run(conversationId, userId)
+}
+
+export function deleteMessage(messageId: string, userId: string, mode: 'me' | 'all') {
+  const db = getDb()
+  if (mode === 'all') {
+    const msg = db.prepare('SELECT conversation_id, sender_id FROM messages WHERE rId = ?').get(messageId) as any
+    if (!msg || msg.sender_id !== userId) return null
+    db.prepare('DELETE FROM messages WHERE rId = ?').run(messageId)
+    return msg.conversation_id
+  } else {
+    const msg = db.prepare('SELECT conversation_id FROM messages WHERE rId = ?').get(messageId) as any
+    if (!msg) return null
+    db.prepare('INSERT OR IGNORE INTO message_deletions (message_rId, user_id) VALUES (?, ?)').run(messageId, userId)
+    return msg.conversation_id
+  }
 }
 
 export function deleteConversation(conversationId: string, userId: string) {

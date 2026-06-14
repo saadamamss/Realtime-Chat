@@ -18,6 +18,9 @@ logs
 .fleet
 .idea
 
+# Generated data
+data/
+
 # Local env files
 .env
 .env.*
