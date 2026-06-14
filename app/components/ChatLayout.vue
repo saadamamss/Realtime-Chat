@@ -70,17 +70,25 @@
               :alt="chat.displayName"
               class="w-12 h-12 rounded-full object-cover shrink-0"
             />
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <p class="text-sm font-medium text-text-primary truncate">{{ chat.displayName }}</p>
-                <span
-                  v-if="$ws.isOnline(chat.otherId)"
-                  class="w-1.5 h-1.5 rounded-full bg-success shrink-0"
-                  title="Online"
-                />
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <p class="text-sm font-medium text-text-primary truncate">{{ chat.displayName }}</p>
+                  <span
+                    v-if="$ws.isOnline(chat.otherId)"
+                    class="w-1.5 h-1.5 rounded-full bg-success shrink-0"
+                    title="Online"
+                  />
+                </div>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <p class="text-xs text-text-secondary truncate flex-1 min-w-0">{{ chat.last_message || 'No messages yet' }}</p>
+                  <span
+                    v-if="chat.unreadCount > 0"
+                    class="shrink-0 min-w-[20px] h-5 rounded-full bg-danger flex items-center justify-center px-1"
+                  >
+                    <span class="text-[10px] font-bold text-white leading-none">{{ chat.unreadCount > 99 ? '99+' : chat.unreadCount }}</span>
+                  </span>
+                </div>
               </div>
-              <p class="text-xs text-text-secondary truncate mt-0.5">{{ chat.last_message || 'No messages yet' }}</p>
-            </div>
             <button
               @click.stop="openContextMenu($event, chat)"
               class="w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -462,6 +470,7 @@ async function selectContact(contact: any) {
 
 async function selectChat(chat: any) {
   if (isDrawer.value) drawerOpen.value = false
+  chat.unreadCount = 0
   try {
     const { data } = await $axios.post('/conversations', { contact_id: chat.otherId })
     currentConversationId.value = data.conversation.id
@@ -570,6 +579,7 @@ async function loadData() {
         phone_number: other.phone_number || '',
         last_message: conv.last_message || '',
         last_message_at: conv.last_message_at || '',
+        unreadCount: conv.unread_count || 0,
       }
     })
   } catch (e) {
@@ -586,7 +596,12 @@ const onWsMessage = (data: any) => {
       loadData()
     } else {
       const chat = chats.value.find((c) => c.id === data.conversation_id)
-      if (chat) chat.last_message = data.message?.content || ''
+      if (chat) {
+        chat.last_message = data.message?.content || ''
+        if (data.message?.sender?.id !== $auth.currentUser?.id && data.conversation_id !== currentConversationId.value) {
+          chat.unreadCount = (chat.unreadCount || 0) + 1
+        }
+      }
     }
   }
 }

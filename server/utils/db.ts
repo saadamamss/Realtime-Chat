@@ -362,13 +362,14 @@ export function getConversations(userId: string) {
   const rows = db.prepare(`
     SELECT c.id, c.name, c.created_at,
       (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
-      (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_at
+      (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_at,
+      (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_id != ? AND m.read_at IS NULL) as unread_count
     FROM conversations c
     JOIN conversation_participants cp ON c.id = cp.conversation_id
     WHERE cp.user_id = ? AND cp.hidden = 0
       AND (EXISTS (SELECT 1 FROM messages WHERE conversation_id = c.id LIMIT 1) OR c.created_by = ?)
     ORDER BY last_message_at DESC
-  `).all(userId, userId) as any[]
+  `).all(userId, userId, userId) as any[]
 
   const stmt = db.prepare(`
     SELECT u.id, u.username as name, u.phone_number, u.avatar as image
