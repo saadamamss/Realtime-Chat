@@ -23,6 +23,7 @@ export function identifyPeer(peer: any, userId: string) {
   }
   userIdByPeer.set(peer, userId)
   peerByUserId.set(userId, peer)
+  peer.userId = userId
 
   const onlineIds = [...peerByUserId.keys()].filter(id => id !== userId)
   peer.send(JSON.stringify({ type: 'presence-snapshot', userIds: onlineIds }))
@@ -52,6 +53,12 @@ export function broadcastToConversation(conversationId: string, message: string)
       }
     }
   }
+}
+
+export function isUserSubscribed(userId: string, conversationId: string) {
+  const peer = peerByUserId.get(userId)
+  if (!peer) return false
+  return peer.topics?.has(conversationId) || false
 }
 
 export function sendToUser(userId: string, message: string) {

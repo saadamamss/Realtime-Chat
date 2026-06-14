@@ -1,8 +1,8 @@
 import path from 'path'
 import fs from 'fs'
 import { v4 as uuid } from 'uuid'
-import { createMessage, addParticipant, getConversationParticipantIds, getDb } from '../utils/db'
-import { broadcastToConversation, sendToUser } from '../utils/ws'
+import { createMessage, addParticipant, getConversationParticipantIds, getDb, markDelivered } from '../utils/db'
+import { broadcastToConversation, sendToUser, isUserSubscribed } from '../utils/ws'
 
 const UPLOAD_DIR = path.resolve(process.cwd(), 'public', 'uploads')
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
@@ -92,10 +92,19 @@ export default defineEventHandler(async (event) => {
   const payload = JSON.stringify({ type: 'new-message', message: formatted, conversation_id: conversationId })
   broadcastToConversation(conversationId, payload)
   const participantIds = getConversationParticipantIds(conversationId)
+  let delivered = false
   for (const pid of participantIds) {
     if (pid !== userId) {
       sendToUser(pid, payload)
+      if (!delivered && isUserSubscribed(pid, conversationId)) {
+        markDelivered(message.rId)
+        delivered = true
+      }
     }
+  }
+  if (delivered) {
+    formatted.delivered_at = new Date().toISOString()
+    sendToUser(userId, JSON.stringify({ type: 'delivery-update', message_id: message.rId, conversation_id: conversationId }))
   }
 
   setResponseStatus(event, 201)

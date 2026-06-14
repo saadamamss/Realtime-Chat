@@ -87,6 +87,7 @@ function initSchema() {
   migrateV4()
   migrateV5()
   migrateV6()
+  migrateV7()
   seedUsers()
 }
 
@@ -138,6 +139,13 @@ function migrateV6() {
   const cols = db.prepare("PRAGMA table_info('messages')").all() as any[]
   if (!cols.some((c: any) => c.name === 'reply_to_rId')) {
     db.exec("ALTER TABLE messages ADD COLUMN reply_to_rId TEXT")
+  }
+}
+
+function migrateV7() {
+  const cols = db.prepare("PRAGMA table_info('messages')").all() as any[]
+  if (!cols.some((c: any) => c.name === 'delivered_at')) {
+    db.exec("ALTER TABLE messages ADD COLUMN delivered_at TEXT")
   }
 }
 
@@ -325,6 +333,20 @@ export function deleteMessage(messageId: string, userId: string, mode: 'me' | 'a
   }
 }
 
+export function markDelivered(messageId: string) {
+  const db = getDb()
+  db.prepare("UPDATE messages SET delivered_at = datetime('now') WHERE rId = ? AND delivered_at IS NULL").run(messageId)
+}
+
+export function markRead(conversationId: string, userId: string) {
+  const db = getDb()
+  const result = db.prepare(`
+    UPDATE messages SET read_at = datetime('now')
+    WHERE conversation_id = ? AND sender_id != ? AND read_at IS NULL
+  `).run(conversationId, userId)
+  return result.changes
+}
+
 export function deleteConversation(conversationId: string, userId: string) {
   const db = getDb()
   db.prepare('UPDATE conversation_participants SET hidden = 1, deleted_at = datetime(\'now\') WHERE conversation_id = ? AND user_id = ?').run(conversationId, userId)
@@ -381,6 +403,7 @@ function formatMessage(row: any, replyMap?: Record<string, any>) {
     file_extension: row.file_extension || '',
     file_size: row.file_size || undefined,
     reply_to: replyTo,
+    delivered_at: row.delivered_at || null,
     read_at: row.read_at,
     created_at: row.created_at,
     created_at_time: new Date(row.created_at).toLocaleTimeString('en-US', { hour12: false }).slice(0, 5),

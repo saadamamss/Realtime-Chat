@@ -199,9 +199,9 @@
         />
         <UIcon
           v-else-if="messageStatus === 'sent' && direction === 'outbound'"
-          :name="message.read_at ? 'ph-checks' : 'ph-check'"
+          :name="message.read_at ? 'ph-checks' : (message.delivered_at ? 'ph-checks' : 'ph-check')"
           class="w-3 h-3"
-          :class="message.read_at ? 'text-blue-300' : ''"
+          :class="message.read_at ? 'text-blue-300' : (message.delivered_at ? 'text-white/70' : '')"
         />
         <UIcon
           v-else-if="messageStatus === 'failed'"

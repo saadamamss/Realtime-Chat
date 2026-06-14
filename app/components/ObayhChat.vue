@@ -274,7 +274,35 @@ const sortedDates = computed(() => {
   return Object.keys(chatData.value).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
 })
 
+function sendReadAck() {
+  if (!props.conversationId) return
+  $ws.send({ type: 'messages-read', conversation_id: props.conversationId })
+}
+
 function handleIncomingMessage(data: any) {
+  if (data.type === 'delivery-update' && data.message_id) {
+    for (const d of Object.keys(chatData.value)) {
+      const found = chatData.value[d]?.find((m: any) => m.rId === data.message_id)
+      if (found) {
+        found.delivered_at = new Date().toISOString()
+        break
+      }
+    }
+    return
+  }
+  if (data.type === 'read-update' && data.conversation_id) {
+    if (data.conversation_id === props.conversationId) {
+      const now = new Date().toISOString()
+      for (const d of Object.keys(chatData.value)) {
+        for (const m of chatData.value[d] || []) {
+          if (m.sender.id === $auth.currentUser?.id && !m.read_at) {
+            m.read_at = now
+          }
+        }
+      }
+    }
+    return
+  }
   if (data.type === 'message-deleted' && data.message_id) {
     removeMessageFromChatData(data.message_id)
     return
@@ -306,6 +334,9 @@ function handleIncomingMessage(data: any) {
     const exists = chatData.value[date].some((m: any) => m.rId === msg.rId)
     if (!exists) {
       chatData.value[date]!.push(msg)
+      if (msg.sender?.id !== $auth.currentUser?.id) {
+        nextTick(() => sendReadAck())
+      }
       nextTick(() => scrollToBottom())
     }
   }
@@ -576,6 +607,7 @@ async function sendMessage() {
       sender: { id: replyingTo.value.sender.id, name: replyingTo.value.sender.name },
       content: replyingTo.value.content,
     } : undefined,
+    delivered_at: null,
     read_at: null,
     created_at: now.toISOString(),
     created_at_time: timeStr,
@@ -708,6 +740,7 @@ watch(() => props.conversationId, async (newId, oldId) => {
   await getUserChatMessages()
   await nextTick()
   scrollToBottom()
+  sendReadAck()
   emit('loaded')
 }, { immediate: true })
 </script>

@@ -1,0 +1,1 @@
+- [Codebase Observations](codebase-observations.md) — Architecture review notes and improvement areas (June 2026)

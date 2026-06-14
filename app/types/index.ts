@@ -37,6 +37,7 @@ export interface ChatMessage {
   file_size?: number
   reply_to?: ReplyTo
   duration?: number
+  delivered_at?: string | null
   read_at: string | null
   created_at: string
   created_at_time: string
