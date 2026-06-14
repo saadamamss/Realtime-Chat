@@ -1,0 +1,77 @@
+Directus project;
+
+/ redirect to /admin/login
+/admin/login
+- login form
+- if logged show signout,continue buttons instead 
+/admin/content
+- if no collections yet , show create collection button.
+- if has any collection redirect to first one of collections /admin/content/{collection}
+/admin/content/{collection}
+- if no items show create item button that route to {collection}/+
+- if has items show items table for this collection
+- {collection}/+ route show the dynamic form according to collection fields
+- items table, when i click on a row route to {collection}/{id} to can edit it
+- table features are rows selection,show hide fields(columns).
+
+/admin/settings/data-model
+- show collections , if no collections show create collection route to /admin/settings/data-model/+ this route didn't open new page just open drawer contains a form to create new collection (Name*, checkbox(singleton), primary key field, pk type(select))
+
+/admin/settings/data-model/{collection}
+- show collection fields
+- collection setup (name,icon,color,note,display template, hidden, singleton)
+
+
+input field form:
+key*, Type[string,UUID,Big Integer,Integer,Float,Decimal,Text], Default Value:Null, Required, Placeholder
+
+textarea field form:
+key*, Type:Text, Default Value:Null, Required, Placeholder, Soft Limit, Trim(checkbox)
+
+WYSIWYG field form:
+key*, Type:Text, Default Value:Null, Required
+
+
+Toggle field form:
+key*, Type:Boolean, Default Value:(checkbox), Required
+
+Date field form:
+key*, Type:Date, Default Value:false, Required
+
+
+Image field form:
+key*, Type:UUID, Default Value:false, Required
+
+
+
+with string type:
+key*,
+type*,
+Length,
+Default Value,
+Nullable (checked by default),
+unique,
+index
+
+with text type:
+all srting type inputs,
+Length: disabled (Not Available for this Type)
+Default value: being a textarea instead input 
+
+with boolean type:
+all srting type inputs,
+Length: disabled (Not Available for this Type)
+
+with integer,biginteger type:
+all srting type inputs,
+Length: disabled (Not Available for this Type)
+
+with float,decimal type:
+all srting type inputs,
+Length: removed and Precision&scale: 2 number inputs appears instead
+
+with UUID type:
+all srting type inputs,
+Length: disabled (Not Available for this Type)
+on create: select
+on update: select

@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-message-out: #2563eb;
+  --color-message-in: #f1f5f9;
+  --color-chat-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-border: #e2e8f0;
+  --color-danger: #ef4444;
+  --color-success: #22c55e;
+}

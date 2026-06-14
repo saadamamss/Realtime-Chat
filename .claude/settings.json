@@ -1,0 +1,8 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:6446",
+    "ANTHROPIC_AUTH_TOKEN": "oc-6f27e12b4ba71d2963f58c16a2a2c4fd305a06da",
+    "ANTHROPIC_MODEL": "deepseek-v4-flash-free"
+    
+  }
+}
