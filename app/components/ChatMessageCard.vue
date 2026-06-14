@@ -1,28 +1,27 @@
 <template>
-  <div class="group relative">
-    <div
-      class="flex gap-2 max-w-[85%]"
-      :class="direction === 'outbound' ? 'flex-row-reverse' : 'flex-row'"
-    >
-      <img
-        :src="message.sender.image"
-        :alt="message.sender.name"
-        class="w-6 h-6 rounded-full object-cover shrink-0 mt-1"
-      />
+  <div
+    class="flex gap-2 max-w-[85%] group"
+    :class="direction === 'outbound' ? 'flex-row-reverse' : 'flex-row'"
+  >
+    <img
+      :src="message.sender.image"
+      :alt="message.sender.name"
+      class="w-6 h-6 rounded-full object-cover shrink-0 mt-1"
+    />
 
-      <div
-        class="rounded-2xl px-3.5 py-2.5 min-w-0 relative"
-        :class="direction === 'outbound'
-          ? 'bg-accent text-white rounded-br-sm'
-          : 'bg-surface text-text-primary border border-border rounded-bl-sm'"
+    <div
+      class="rounded-2xl px-3.5 py-2.5 min-w-0 relative"
+      :class="direction === 'outbound'
+        ? 'bg-accent text-white rounded-br-sm'
+        : 'bg-surface text-text-primary border border-border rounded-bl-sm'"
+    >
+      <button
+        ref="menuBtnRef"
+        class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 w-6 h-6 rounded-full bg-white border border-border flex items-center justify-center shadow-sm transition-opacity z-10 cursor-pointer"
+        @click.stop="toggleMenu"
       >
-        <button
-          ref="menuBtnRef"
-          class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 w-6 h-6 rounded-full bg-white border border-border flex items-center justify-center shadow-sm transition-opacity z-10 cursor-pointer"
-          @click.stop="toggleMenu"
-        >
-          <UIcon name="ph-dots-three-vertical" class="w-3 h-3 text-text-secondary" />
-        </button>
+        <UIcon name="ph-dots-three-vertical" class="w-3 h-3 text-text-secondary" />
+      </button>
       <div v-if="message.file" class="mb-2">
         <div v-if="isImageFile(message.file_extension)" class="relative group -mx-1 -mt-1">
           <img
@@ -186,7 +185,6 @@
           class="w-3 h-3 text-danger"
         />
       </div>
-    </div>
     </div>
     <teleport to="body">
       <div v-if="showMenu" class="fixed inset-0 z-40" @click="showMenu = false" />
