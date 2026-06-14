@@ -276,12 +276,21 @@
 
       <template v-else>
         <div class="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-[#e8f0fe] via-white to-[#fce8e8] relative">
+          <div class="absolute top-4 left-4 flex items-center gap-2">
+            <button
+              v-if="isDrawer"
+              @click="drawerOpen = true"
+              class="w-10 h-10 rounded-xl bg-white shadow-md border border-border flex items-center justify-center hover:bg-gray-50 cursor-pointer"
+            >
+              <UIcon name="ph-list" class="w-5 h-5 text-text-primary" />
+            </button>
+          </div>
           <button
-            v-if="isDrawer"
-            @click="drawerOpen = true"
-            class="absolute top-4 left-4 w-10 h-10 rounded-xl bg-white shadow-md border border-border flex items-center justify-center hover:bg-gray-50 cursor-pointer"
+            @click="handleLogout"
+            class="absolute top-4 right-4 w-10 h-10 rounded-xl bg-white shadow-md border border-border flex items-center justify-center hover:bg-gray-50 cursor-pointer"
+            title="Logout"
           >
-            <UIcon name="ph-list" class="w-5 h-5 text-text-primary" />
+            <UIcon name="ph-sign-out" class="w-5 h-5 text-text-primary" />
           </button>
           <div class="text-center max-w-md">
             <div class="w-56 h-56 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center mx-auto mb-10 shadow-2xl shadow-accent/20 ring-4 ring-accent/10">
