@@ -289,6 +289,13 @@ function handleIncomingMessage(data: any) {
         const found = chatData.value[d]?.find((m: any) => m.rId === msg.rId)
         if (found) {
           found.status = 'sent'
+          found.reply_to = msg.reply_to
+          found.content = msg.content
+          found.file = msg.file
+          found.file_extension = msg.file_extension
+          found.file_size = msg.file_size
+          found.created_at = msg.created_at
+          found.created_at_time = msg.created_at_time
           break
         }
       }
@@ -564,6 +571,11 @@ async function sendMessage() {
     file: filePreview.value ? URL.createObjectURL(filePreview.value.file) : '',
     file_extension: filePreview.value ? filePreview.value.type : '',
     file_size: filePreview.value ? filePreview.value.size : undefined,
+    reply_to: replyingTo.value ? {
+      rId: replyingTo.value.rId,
+      sender: { id: replyingTo.value.sender.id, name: replyingTo.value.sender.name },
+      content: replyingTo.value.content,
+    } : undefined,
     read_at: null,
     created_at: now.toISOString(),
     created_at_time: timeStr,
