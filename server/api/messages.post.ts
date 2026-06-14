@@ -1,7 +1,7 @@
 import path from 'path'
 import fs from 'fs'
 import { v4 as uuid } from 'uuid'
-import { createMessage, addParticipant, getConversationParticipantIds } from '../utils/db'
+import { createMessage, addParticipant, getConversationParticipantIds, getDb } from '../utils/db'
 import { broadcastToConversation, sendToUser } from '../utils/ws'
 
 const UPLOAD_DIR = path.resolve(process.cwd(), 'public', 'uploads')
@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
   let fileSize = 0
   let customRId = ''
   let conversationId = ''
+  let replyToRId = ''
 
   for (const part of body) {
     const name = part.name || ''
@@ -32,6 +33,7 @@ export default defineEventHandler(async (event) => {
     else if (name === 'file_extension') fileExt = part.data.toString()
     else if (name === 'file_size') fileSize = parseInt(part.data.toString()) || 0
     else if (name === 'rId') customRId = part.data.toString()
+    else if (name === 'reply_to_rId') replyToRId = part.data.toString()
     else if (name === 'file' && part.filename) {
       const ext = path.extname(part.filename)
       const filename = `${uuid()}${ext}`
@@ -50,7 +52,22 @@ export default defineEventHandler(async (event) => {
     content,
     filePath ? { url: filePath, ext: fileExt, size: fileSize } : undefined,
     customRId || undefined,
+    replyToRId || undefined,
   ) as any
+
+  let replyTo
+  if (replyToRId) {
+    const db = getDb()
+    const target = db.prepare(`
+      SELECT m.rId, m.content, m.sender_id, u.username as sender_name
+      FROM messages m
+      JOIN users u ON m.sender_id = u.id
+      WHERE m.rId = ?
+    `).get(replyToRId) as any
+    if (target) {
+      replyTo = { rId: target.rId, sender: { id: target.sender_id, name: target.sender_name }, content: target.content }
+    }
+  }
 
   const formatted = {
     rId: message.rId,
@@ -65,6 +82,7 @@ export default defineEventHandler(async (event) => {
     file: message.file_url || '',
     file_extension: message.file_extension || '',
     file_size: message.file_size || undefined,
+    reply_to: replyTo,
     read_at: message.read_at,
     created_at: message.created_at,
     created_at_time: new Date(message.created_at).toLocaleTimeString('en-US', { hour12: false }).slice(0, 5),

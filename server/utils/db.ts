@@ -86,6 +86,7 @@ function initSchema() {
   migrateV3()
   migrateV4()
   migrateV5()
+  migrateV6()
   seedUsers()
 }
 
@@ -130,6 +131,13 @@ function migrateV5() {
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `)
+  }
+}
+
+function migrateV6() {
+  const cols = db.prepare("PRAGMA table_info('messages')").all() as any[]
+  if (!cols.some((c: any) => c.name === 'reply_to_rId')) {
+    db.exec("ALTER TABLE messages ADD COLUMN reply_to_rId TEXT")
   }
 }
 
@@ -225,13 +233,13 @@ export function addParticipant(conversationId: string, userId: string) {
   }
 }
 
-export function createMessage(senderId: string, conversationId: string, content: string, file?: { url: string; ext: string; size: number }, customRId?: string) {
+export function createMessage(senderId: string, conversationId: string, content: string, file?: { url: string; ext: string; size: number }, customRId?: string, replyToRId?: string) {
   const db = getDb()
   const rId = customRId || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   db.prepare(`
-    INSERT INTO messages (rId, sender_id, conversation_id, content, file_url, file_extension, file_size)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(rId, senderId, conversationId, content, file?.url || '', file?.ext || '', file?.size || null)
+    INSERT INTO messages (rId, sender_id, conversation_id, content, file_url, file_extension, file_size, reply_to_rId)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(rId, senderId, conversationId, content, file?.url || '', file?.ext || '', file?.size || null, replyToRId || null)
   return db.prepare('SELECT * FROM messages WHERE rId = ?').get(rId)
 }
 
@@ -262,11 +270,26 @@ export function getMessages(conversationId: string, userId: string, page: number
   `).get(userId, userId, conversationId) as any).count
   const lastPage = Math.ceil(total / perPage)
 
+  const replyRIds = rows.filter((r: any) => r.reply_to_rId).map((r: any) => r.reply_to_rId).filter(Boolean)
+  const replyMap: Record<string, any> = {}
+  if (replyRIds.length > 0) {
+    const placeholders = replyRIds.map(() => '?').join(',')
+    const replies = db.prepare(`
+      SELECT m.rId, m.content, m.sender_id, u.username as sender_name
+      FROM messages m
+      JOIN users u ON m.sender_id = u.id
+      WHERE m.rId IN (${placeholders})
+    `).all(...replyRIds) as any[]
+    for (const r of replies) {
+      replyMap[r.rId] = { sender: { id: r.sender_id, name: r.sender_name }, content: r.content }
+    }
+  }
+
   const grouped: Record<string, any[]> = {}
   for (const row of rows.reverse()) {
     const date = new Date(row.created_at).toISOString().split('T')[0] as string
     if (!grouped[date]) grouped[date] = []
-    grouped[date].push(formatMessage(row))
+    grouped[date].push(formatMessage(row, replyMap))
   }
 
   return { data: grouped, last_page: lastPage, total }
@@ -342,7 +365,9 @@ export function getConversations(userId: string) {
   })
 }
 
-function formatMessage(row: any) {
+function formatMessage(row: any, replyMap?: Record<string, any>) {
+  const replyToRId = row.reply_to_rId
+  const replyTo = replyToRId && replyMap?.[replyToRId] ? { rId: replyToRId, ...replyMap[replyToRId] } : undefined
   return {
     rId: row.rId,
     id: row.id,
@@ -355,6 +380,7 @@ function formatMessage(row: any) {
     file: row.file_url || '',
     file_extension: row.file_extension || '',
     file_size: row.file_size || undefined,
+    reply_to: replyTo,
     read_at: row.read_at,
     created_at: row.created_at,
     created_at_time: new Date(row.created_at).toLocaleTimeString('en-US', { hour12: false }).slice(0, 5),

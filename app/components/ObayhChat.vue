@@ -46,6 +46,8 @@
               @file-download="downloadFile"
               @retry-send-message="retrySendMessage"
               @delete-message="openDeleteDialog"
+              @reply-message="startReply"
+              @scroll-to-message="scrollToMessage"
               :status="(pendingMessages[message.rId]?.status as 'sending' | 'sent' | 'failed') || message.status || 'sent'"
               :progress="pendingMessages[message.rId]?.progress || 0"
               :cancelTokenSource="pendingMessages[message.rId]?.cancelTokenSource || null"
@@ -119,6 +121,19 @@
         <span class="text-sm text-danger">{{ recordingTime }}</span>
         <div class="flex-1" />
         <button @click="stopRecording" class="text-sm text-danger font-semibold hover:underline cursor-pointer">Stop</button>
+      </div>
+
+      <div v-if="replyingTo" class="flex items-stretch gap-2 px-4 py-2 bg-blue-50 border-t-2 border-blue-200">
+        <div class="flex items-stretch gap-2 flex-1 min-w-0">
+          <div class="w-1 shrink-0 bg-accent rounded-full" />
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-accent truncate">Replying to {{ replyingTo.sender.name }}</p>
+            <p class="text-xs text-text-secondary truncate">{{ replyingTo.content || (replyingTo.file ? 'File' : '') || 'Message' }}</p>
+          </div>
+        </div>
+        <button @click="cancelReply" class="w-6 h-6 rounded-full hover:bg-blue-100 flex items-center justify-center shrink-0 cursor-pointer">
+          <UIcon name="ph-x" class="w-4 h-4 text-text-secondary" />
+        </button>
       </div>
 
       <div class="flex items-stretch gap-2 px-4 py-4">
@@ -240,6 +255,8 @@ const showDeleteDialog = ref(false)
 const deleteTargetMessage = ref<ChatMessage | null>(null)
 const deleteMode = ref<'me' | 'all'>('me')
 const canDeleteForAll = computed(() => deleteTargetMessage.value?.sender.id === $auth.currentUser?.id)
+
+const replyingTo = ref<ChatMessage | null>(null)
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
@@ -391,6 +408,23 @@ function removeMessageFromChatData(messageId: string) {
         break
       }
     }
+  }
+}
+
+function startReply(message: ChatMessage) {
+  replyingTo.value = message
+  clearFilePreview()
+  ;(document.querySelector('textarea') as HTMLTextAreaElement)?.focus()
+}
+
+function cancelReply() {
+  replyingTo.value = null
+}
+
+function scrollToMessage(rId: string) {
+  const el = document.querySelector(`[data-r-id="${rId}"]`)
+  if (el) {
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }
 }
 
@@ -552,6 +586,10 @@ async function sendMessage() {
     formData.append('sender_name', $auth.currentUser?.username || '')
     formData.append('sender_avatar', $auth.currentUser?.avatar || '')
     formData.append('rId', tempId)
+    if (replyingTo.value) {
+      formData.append('reply_to_rId', replyingTo.value.rId)
+      cancelReply()
+    }
     if (fileValue.value instanceof File) {
       formData.append('file', fileValue.value)
       formData.append('file_extension', filePreview.value?.type || '')
@@ -595,6 +633,9 @@ async function retrySendMessage(message: ChatMessage) {
     formData.append('sender_name', $auth.currentUser?.username || '')
     formData.append('sender_avatar', $auth.currentUser?.avatar || '')
     formData.append('rId', message.rId)
+    if (message.reply_to?.rId) {
+      formData.append('reply_to_rId', message.reply_to.rId)
+    }
     if (pending.file instanceof File) {
       formData.append('file', pending.file)
       formData.append('file_extension', message.file_extension || '')

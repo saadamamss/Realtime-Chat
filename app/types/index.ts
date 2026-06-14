@@ -20,6 +20,12 @@ export interface FilePreview {
   size: number
 }
 
+export interface ReplyTo {
+  rId: string
+  sender: { id: string; name: string }
+  content: string
+}
+
 export interface ChatMessage {
   rId: string
   id: number
@@ -29,6 +35,7 @@ export interface ChatMessage {
   file?: string
   file_extension?: string
   file_size?: number
+  reply_to?: ReplyTo
   duration?: number
   read_at: string | null
   created_at: string

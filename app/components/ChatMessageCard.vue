@@ -1,5 +1,6 @@
 <template>
   <div
+    :data-r-id="message.rId"
     class="flex gap-2 max-w-[85%] group"
     :class="direction === 'outbound' ? 'flex-row-reverse' : 'flex-row'"
   >
@@ -15,13 +16,36 @@
         ? 'bg-accent text-white rounded-br-sm'
         : 'bg-surface text-text-primary border border-border rounded-bl-sm'"
     >
-      <button
-        ref="menuBtnRef"
-        class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 w-6 h-6 rounded-full bg-white border border-border flex items-center justify-center shadow-sm transition-opacity z-10 cursor-pointer"
-        @click.stop="toggleMenu"
-      >
-        <UIcon name="ph-dots-three-vertical" class="w-3 h-3 text-text-secondary" />
-      </button>
+        <button
+          ref="menuBtnRef"
+          class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 w-6 h-6 rounded-full bg-white border border-border flex items-center justify-center shadow-sm transition-opacity z-10 cursor-pointer"
+          @click.stop="toggleMenu"
+        >
+          <UIcon name="ph-dots-three-vertical" class="w-3 h-3 text-text-secondary" />
+        </button>
+        <div
+          v-if="message.reply_to"
+          class="mb-2 flex items-stretch gap-2 cursor-pointer"
+          :class="direction === 'outbound' ? 'bg-white/15' : 'bg-gray-100'"
+          style="border-radius: 8px; overflow: hidden;"
+          @click="$emit('scroll-to-message', message.reply_to.rId)"
+        >
+          <div
+            class="w-1 shrink-0"
+            :class="direction === 'outbound' ? 'bg-blue-300' : 'bg-accent'"
+          />
+          <div class="py-1.5 pr-2 min-w-0">
+            <p
+              class="text-xs font-semibold truncate"
+              :class="direction === 'outbound' ? 'text-blue-200' : 'text-accent'"
+            >
+              {{ message.reply_to.sender.name }}
+            </p>
+            <p class="text-xs truncate" :class="direction === 'outbound' ? 'text-white/70' : 'text-text-secondary'">
+              {{ message.reply_to.content || (message.reply_to.file ? 'File' : '') || 'Message' }}
+            </p>
+          </div>
+        </div>
       <div v-if="message.file" class="mb-2">
         <div v-if="isImageFile(message.file_extension)" class="relative group -mx-1 -mt-1">
           <img
@@ -195,6 +219,14 @@
         @click.stop
       >
         <button
+          class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-primary hover:bg-gray-50 transition-colors cursor-pointer"
+          @click="emitReply"
+        >
+          <UIcon name="ph-arrow-bend-up-left" class="w-4 h-4" />
+          Reply
+        </button>
+        <div class="border-t border-border my-1" />
+        <button
           class="flex items-center gap-2 w-full px-3 py-2 text-sm text-danger hover:bg-red-50 transition-colors cursor-pointer"
           @click="emitDelete"
         >
@@ -222,6 +254,8 @@ interface Emits {
   (e: "file-download", fileUrl: string, fileName: string): void;
   (e: "retry-send-message", message: ChatMessage): void;
   (e: "delete-message", message: ChatMessage): void;
+  (e: "reply-message", message: ChatMessage): void;
+  (e: "scroll-to-message", rId: string): void;
 }
 
 const props = defineProps<Props>();
@@ -247,6 +281,11 @@ function toggleMenu() {
 function emitDelete() {
   showMenu.value = false;
   emit("delete-message", props.message);
+}
+
+function emitReply() {
+  showMenu.value = false;
+  emit("reply-message", props.message);
 }
 
 const audioPlayer = ref<HTMLAudioElement | null>(null);
