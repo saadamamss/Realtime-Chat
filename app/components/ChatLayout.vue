@@ -278,7 +278,7 @@
         </div>
 
         <div class="flex-1 min-h-0">
-          <ObayhChat :key="chatKey" :conversation-id="currentConversationId" @loaded="chatLoaded = true" />
+          <ChatMessages :key="chatKey" :conversation-id="currentConversationId" @loaded="chatLoaded = true" />
         </div>
       </template>
 
@@ -337,6 +337,8 @@
 
 <script setup lang="ts">
 const { $axios, $auth, $ws } = useNuxtApp()
+import { useToast } from '../composables/useToast'
+const toast = useToast()
 
 const SIDEBAR_MIN = 260
 const CHAT_MIN = 500
@@ -438,7 +440,7 @@ async function removeContact(contact: any) {
       activeChat.value.displayName = contact.phone_number || contact.name
     }
   } catch (e: any) {
-    console.error('Failed to remove contact', e)
+    toast.error({ title: 'Failed to remove contact' })
   }
 }
 
@@ -464,7 +466,7 @@ async function selectContact(contact: any) {
     })
     currentConversationId.value = conv.id
   } catch (e: any) {
-    console.error('Failed to create conversation', e)
+    toast.error({ title: 'Failed to start conversation' })
   }
 }
 
@@ -475,7 +477,7 @@ async function selectChat(chat: any) {
     const { data } = await $axios.post('/conversations', { contact_id: chat.otherId })
     currentConversationId.value = data.conversation.id
   } catch (e: any) {
-    console.error('Failed to create conversation', e)
+    toast.error({ title: 'Failed to open conversation' })
   }
 }
 
@@ -512,7 +514,7 @@ async function addContactFromChat() {
     chat.displayName = data.contact.name
     contactList.value.push(data.contact)
   } catch (e: any) {
-    console.error('Failed to add contact', e)
+    toast.error({ title: 'Failed to add contact' })
   }
 }
 
@@ -526,7 +528,7 @@ async function wipeChat() {
     const chat = chats.value.find((c) => c.id === convId)
     if (chat) chat.last_message = ''
   } catch (e: any) {
-    console.error('Failed to wipe conversation', e)
+    toast.error({ title: 'Failed to wipe conversation' })
   }
 }
 
@@ -539,7 +541,7 @@ async function deleteChat() {
     await $axios.delete('/conversations', { data: { conversation_id: convId } })
     chats.value = chats.value.filter((c) => c.id !== convId)
   } catch (e: any) {
-    console.error('Failed to delete conversation', e)
+    toast.error({ title: 'Failed to delete conversation' })
   }
 }
 
@@ -583,7 +585,7 @@ async function loadData() {
       }
     })
   } catch (e) {
-    console.error('Failed to load data', e)
+    toast.error({ title: 'Failed to load chat data' })
   } finally {
     loading.value = false
   }

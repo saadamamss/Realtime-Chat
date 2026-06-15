@@ -1,4 +1,4 @@
-export const useObayhToast = () => {
+export const useToast = () => {
   const Toast = useToast();
 
   const success = ({

@@ -36,10 +36,20 @@
           <div
             v-for="message in chatData[date]"
             :key="message.rId"
-            class="flex mb-3"
-            :class="message.sender.id === $auth.currentUser?.id ? 'justify-end' : 'justify-start'"
           >
-            <ChatMessageCard
+            <div
+              v-if="unreadBadgeCount > 0 && firstUnreadRId === message.rId"
+              class="flex justify-center my-4"
+            >
+              <span class="text-[11px] font-medium text-white bg-danger px-3 py-1 rounded-full shadow-xs">
+                {{ unreadBadgeCount }} unread message{{ unreadBadgeCount > 1 ? 's' : '' }}
+              </span>
+            </div>
+            <div
+              class="flex mb-3"
+              :class="message.sender.id === $auth.currentUser?.id ? 'justify-end' : 'justify-start'"
+            >
+              <ChatMessageCard
               :message="message"
               :direction="message.sender.id === $auth.currentUser?.id ? 'outbound' : 'inbound'"
               @file-preview="openFilePreview"
@@ -52,6 +62,7 @@
               :progress="pendingMessages[message.rId]?.progress || 0"
               :cancelTokenSource="pendingMessages[message.rId]?.cancelTokenSource || null"
             />
+          </div>
           </div>
         </div>
       </template>
@@ -223,11 +234,11 @@
 </template>
 
 <script setup lang="ts">
-import { useObayhToast } from '../composables/useObayhToast'
+import { useToast } from '../composables/useToast'
 import type { ChatData, ChatMessage, FilePreview, ChatUser } from '../types'
 
 const { $axios, $auth, $ws } = useNuxtApp()
-const obayhToast = useObayhToast()
+const toast = useToast()
 
 const props = defineProps<{ conversationId: string }>()
 const emit = defineEmits<{ (e: 'loaded'): void }>()
@@ -257,6 +268,7 @@ const deleteMode = ref<'me' | 'all'>('me')
 const canDeleteForAll = computed(() => deleteTargetMessage.value?.sender.id === $auth.currentUser?.id)
 
 const replyingTo = ref<ChatMessage | null>(null)
+const unreadBadgeCount = ref(0)
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
@@ -274,9 +286,43 @@ const sortedDates = computed(() => {
   return Object.keys(chatData.value).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
 })
 
+const firstUnreadRId = computed(() => {
+  for (const date of sortedDates.value) {
+    for (const msg of chatData.value[date] || []) {
+      if (msg.sender.id !== $auth.currentUser?.id && !msg.read_at) {
+        return msg.rId
+      }
+    }
+  }
+  return null
+})
+
+const unreadMessageCount = computed(() => {
+  let count = 0
+  for (const date of sortedDates.value) {
+    for (const msg of chatData.value[date] || []) {
+      if (msg.sender.id !== $auth.currentUser?.id && !msg.read_at) {
+        count++
+      }
+    }
+  }
+  return count
+})
+
 function sendReadAck() {
   if (!props.conversationId) return
   $ws.send({ type: 'messages-read', conversation_id: props.conversationId })
+}
+
+function markReadLocally() {
+  const now = new Date().toISOString()
+  for (const d of Object.keys(chatData.value)) {
+    for (const m of chatData.value[d] || []) {
+      if (m.sender.id !== $auth.currentUser?.id && !m.read_at) {
+        m.read_at = now
+      }
+    }
+  }
 }
 
 function handleIncomingMessage(data: any) {
@@ -335,6 +381,8 @@ function handleIncomingMessage(data: any) {
     if (!exists) {
       chatData.value[date]!.push(msg)
       if (msg.sender?.id !== $auth.currentUser?.id) {
+        unreadBadgeCount.value = 0
+        markReadLocally()
         nextTick(() => sendReadAck())
       }
       nextTick(() => scrollToBottom())
@@ -431,7 +479,7 @@ async function confirmDelete() {
     showDeleteDialog.value = false
     deleteTargetMessage.value = null
   } catch {
-    obayhToast.error({ title: 'Failed to delete message' })
+    toast.error({ title: 'Failed to delete message' })
   }
 }
 
@@ -521,12 +569,7 @@ async function startRecording() {
       recordingTime.value = `${Math.floor(e / 60)}:${(e % 60).toString().padStart(2, '0')}`
     }, 1000)
   } catch {
-    isRecording.value = true
-    recordingStartTime = Date.now()
-    recordingInterval = setInterval(() => {
-      const e = Math.floor((Date.now() - (recordingStartTime || 0)) / 1000)
-      recordingTime.value = `${Math.floor(e / 60)}:${(e % 60).toString().padStart(2, '0')}`
-    }, 1000)
+    toast.error({ title: 'Microphone access denied', description: 'Allow microphone permission to record voice messages.' })
   }
 }
 
@@ -569,7 +612,7 @@ async function getUserChatMessages() {
     hasMoreOldMessages.value = chatCurrentPage.value < data.last_page
     if (hasMoreOldMessages.value) chatCurrentPage.value++
   } catch (error) {
-    console.error('Error fetching messages:', error)
+    toast.error({ title: 'Failed to load messages' })
   } finally {
     loadingOldMessages.value = false
     loadingLastMessages.value = false
@@ -580,8 +623,14 @@ async function sendMessage() {
   const content = newMessage.value.trim()
   if (!content && !fileValue.value) return
   if (fileValue.value instanceof File && fileValue.value.size > MAX_FILE_SIZE) {
-    obayhToast.error({ title: 'File size exceeds the limit' })
+    toast.error({ title: 'File size exceeds the limit' })
     return
+  }
+
+  if (unreadBadgeCount.value > 0) {
+    unreadBadgeCount.value = 0
+    markReadLocally()
+    sendReadAck()
   }
 
   const tempId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -658,7 +707,7 @@ async function sendMessage() {
     if (err.name !== 'CanceledError') {
       pendingMessages.value[tempId].status = 'failed'
       optimistic.status = 'failed'
-      obayhToast.error({ title: 'Failed to send message', description: err?.response?.data?.message })
+      toast.error({ title: 'Failed to send message', description: err?.response?.data?.message })
     }
   }
 }
@@ -701,7 +750,7 @@ async function retrySendMessage(message: ChatMessage) {
     }
   } catch (err: any) {
     pending.status = 'failed'
-    obayhToast.error({ title: 'Failed to send message', description: err?.response?.data?.message })
+    toast.error({ title: 'Failed to send message', description: err?.response?.data?.message })
   }
 }
 
@@ -741,6 +790,7 @@ watch(() => props.conversationId, async (newId, oldId) => {
   await nextTick()
   scrollToBottom()
   sendReadAck()
+  unreadBadgeCount.value = unreadMessageCount.value
   emit('loaded')
 }, { immediate: true })
 </script>

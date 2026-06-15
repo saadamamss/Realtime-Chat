@@ -47,6 +47,8 @@
 
 <script setup lang="ts">
 const { $auth } = useNuxtApp()
+import { useToast } from './composables/useToast'
+const toast = useToast()
 
 const username = ref('')
 const phoneNumber = ref('')
@@ -60,7 +62,7 @@ async function handleLogin() {
     await $auth.login(username.value.trim(), phoneNumber.value.trim())
     loggedIn.value = true
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to login')
+    toast.error({ title: 'Failed to login', description: e?.response?.data?.message })
   } finally {
     loading.value = false
   }
