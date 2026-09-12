@@ -1,18 +1,13 @@
 import { addContact } from '../utils/db'
+import { validate, contactSchema } from '../utils/validation'
 
 export default defineEventHandler(async (event) => {
-  const userId = getHeader(event, 'x-user-id')
-  if (!userId) throw createError({ statusCode: 401, message: 'Unauthorized' })
-
-  const { phone_number } = await readBody(event)
-  if (!phone_number || typeof phone_number !== 'string' || !phone_number.trim()) {
-    throw createError({ statusCode: 400, message: 'Phone number is required' })
-  }
-
-  const contact = addContact(userId, phone_number.trim())
+  const userId = event.context.userId
+  const body = await readBody(event)
+  const input = validate(contactSchema, body)
+  const contact = addContact(userId, input.phone_number)
   if (!contact) {
     throw createError({ statusCode: 404, message: 'User with this phone number not found' })
   }
-
   return { contact }
 })

@@ -1,12 +1,12 @@
-import { reactive, ref } from 'vue'
+import { reactive } from 'vue'
 
 export default defineNuxtPlugin(() => {
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
   let currentConversationId: string | null = null
+  let currentToken: string | null = null
   const messageHandlers: Set<(data: any) => void> = new Set()
-  let currentUserId: string | null = null
 
   const state = reactive<{ connected: boolean }>({
     connected: false,
@@ -14,9 +14,17 @@ export default defineNuxtPlugin(() => {
 
   const onlineUsers = reactive<Set<string>>(new Set())
 
-  function connect(userId?: string) {
+  async function connect() {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
-    if (userId) currentUserId = userId
+
+    try {
+      const res = await fetch('/api/auth/token', { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      currentToken = data.token
+    } catch {
+      return
+    }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const url = `${protocol}//${window.location.host}/ws`
@@ -25,8 +33,8 @@ export default defineNuxtPlugin(() => {
 
     ws.onopen = () => {
       state.connected = true
-      if (currentUserId) {
-        send({ type: 'identify', userId: currentUserId })
+      if (currentToken) {
+        send({ type: 'authenticate', token: currentToken })
       }
       if (currentConversationId) {
         send({ type: 'join', conversationId: currentConversationId })
@@ -46,6 +54,14 @@ export default defineNuxtPlugin(() => {
           onlineUsers.add(data.userId)
         } else if (data.type === 'user-offline' && data.userId) {
           onlineUsers.delete(data.userId)
+        } else if (data.type === 'error') {
+          if (data.message === 'Invalid token' || data.message === 'Not authenticated') {
+            currentToken = null
+            ws?.close()
+          }
+          return
+        } else if (data.type === 'pong') {
+          return
         }
         for (const handler of messageHandlers) handler(data)
       } catch {
@@ -114,6 +130,12 @@ export default defineNuxtPlugin(() => {
     return onlineUsers.has(userId)
   }
 
+  function disconnect() {
+    currentToken = null
+    ws?.close()
+    ws = null
+  }
+
   return {
     provide: {
       ws: {
@@ -124,6 +146,7 @@ export default defineNuxtPlugin(() => {
           return onlineUsers
         },
         connect,
+        disconnect,
         send,
         onMessage,
         offMessage,

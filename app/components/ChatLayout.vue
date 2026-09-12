@@ -337,9 +337,9 @@
 
 <script setup lang="ts">
 const { $axios, $auth, $ws } = useNuxtApp()
-import { useToast } from '../composables/useToast'
-const toast = useToast()
+import { useAppToast } from '../composables/useAppToast'
 
+const toast = useAppToast()
 const SIDEBAR_MIN = 260
 const CHAT_MIN = 500
 const SIDEBAR_DEFAULT = 340
@@ -617,7 +617,7 @@ onMounted(async () => {
 
   await loadData()
 
-  $ws.connect($auth.currentUser?.id)
+  $ws.connect()
   $ws.onMessage(onWsMessage)
 })
 

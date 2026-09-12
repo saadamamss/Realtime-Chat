@@ -234,11 +234,11 @@
 </template>
 
 <script setup lang="ts">
-import { useToast } from '../composables/useToast'
+import { useAppToast } from '../composables/useAppToast'
 import type { ChatData, ChatMessage, FilePreview, ChatUser } from '../types'
 
 const { $axios, $auth, $ws } = useNuxtApp()
-const toast = useToast()
+const toast = useAppToast()
 
 const props = defineProps<{ conversationId: string }>()
 const emit = defineEmits<{ (e: 'loaded'): void }>()
@@ -355,7 +355,6 @@ function handleIncomingMessage(data: any) {
   }
   if (data.type === 'new-message' && data.message) {
     const msg = data.message
-    const date = new Date(msg.created_at).toISOString().split('T')[0] as string
 
     if (pendingMessages.value[msg.rId]) {
       delete pendingMessages.value[msg.rId]
@@ -376,6 +375,11 @@ function handleIncomingMessage(data: any) {
       return
     }
 
+    if (data.conversation_id !== props.conversationId) return
+
+    const date = msg.created_at.includes('T')
+      ? msg.created_at.split('T')[0]
+      : msg.created_at.split(' ')[0]
     if (!chatData.value[date]) chatData.value[date] = []
     const exists = chatData.value[date].some((m: any) => m.rId === msg.rId)
     if (!exists) {
@@ -592,7 +596,7 @@ async function getUserChatMessages() {
     if (Object.keys(chatData.value).length > 0) {
       for (const [date, msgs] of Object.entries(data.data)) {
         chatData.value[date] = chatData.value[date]
-          ? [...chatData.value[date], ...(msgs as any[])]
+          ? [...(msgs as any[]), ...chatData.value[date]]
           : (msgs as any[])
       }
     } else {
@@ -676,8 +680,6 @@ async function sendMessage() {
     const formData = new FormData()
     formData.append('conversation_id', props.conversationId)
     formData.append('content', content)
-    formData.append('sender_name', $auth.currentUser?.username || '')
-    formData.append('sender_avatar', $auth.currentUser?.avatar || '')
     formData.append('rId', tempId)
     if (replyingTo.value) {
       formData.append('reply_to_rId', replyingTo.value.rId)
@@ -723,8 +725,6 @@ async function retrySendMessage(message: ChatMessage) {
     const formData = new FormData()
     formData.append('conversation_id', props.conversationId)
     formData.append('content', message.content)
-    formData.append('sender_name', $auth.currentUser?.username || '')
-    formData.append('sender_avatar', $auth.currentUser?.avatar || '')
     formData.append('rId', message.rId)
     if (message.reply_to?.rId) {
       formData.append('reply_to_rId', message.reply_to.rId)

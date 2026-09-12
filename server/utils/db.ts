@@ -88,6 +88,7 @@ function initSchema() {
   migrateV5()
   migrateV6()
   migrateV7()
+  migrateV8()
   seedUsers()
 }
 
@@ -146,6 +147,13 @@ function migrateV7() {
   const cols = db.prepare("PRAGMA table_info('messages')").all() as any[]
   if (!cols.some((c: any) => c.name === 'delivered_at')) {
     db.exec("ALTER TABLE messages ADD COLUMN delivered_at TEXT")
+  }
+}
+
+function migrateV8() {
+  const cols = db.prepare("PRAGMA table_info('users')").all() as any[]
+  if (!cols.some((c: any) => c.name === 'password_hash')) {
+    db.exec("ALTER TABLE users ADD COLUMN password_hash TEXT")
   }
 }
 
@@ -295,7 +303,7 @@ export function getMessages(conversationId: string, userId: string, page: number
 
   const grouped: Record<string, any[]> = {}
   for (const row of rows.reverse()) {
-    const date = new Date(row.created_at).toISOString().split('T')[0] as string
+    const date = row.created_at.includes('T') ? row.created_at.split('T')[0] : row.created_at.split(' ')[0] as string
     if (!grouped[date]) grouped[date] = []
     grouped[date].push(formatMessage(row, replyMap))
   }
@@ -410,4 +418,28 @@ function formatMessage(row: any, replyMap?: Record<string, any>) {
     created_at_time: new Date(row.created_at).toLocaleTimeString('en-US', { hour12: false }).slice(0, 5),
     status: 'sent' as const,
   }
+}
+
+export function findUserByPhoneNumber(phoneNumber: string) {
+  const db = getDb()
+  return db.prepare('SELECT * FROM users WHERE phone_number = ?').get(phoneNumber) as any || null
+}
+
+export function createUser(username: string, phoneNumber: string, passwordHash: string) {
+  const db = getDb()
+  const id = uuid()
+  const avatar = `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(username)}&backgroundColor=2563eb&textColor=ffffff`
+  db.prepare('INSERT INTO users (id, username, phone_number, avatar, password_hash) VALUES (?, ?, ?, ?, ?)').run(id, username, phoneNumber, avatar, passwordHash)
+  return db.prepare('SELECT id, username, phone_number, avatar FROM users WHERE id = ?').get(id) as any
+}
+
+export function findUserById(id: string) {
+  const db = getDb()
+  return db.prepare('SELECT id, username, phone_number, avatar FROM users WHERE id = ?').get(id) as any || null
+}
+
+export function getFileConversationId(filename: string) {
+  const db = getDb()
+  const row = db.prepare('SELECT conversation_id FROM messages WHERE file_url LIKE ?').get(`%${filename}`) as any
+  return row?.conversation_id || null
 }

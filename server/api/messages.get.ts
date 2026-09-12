@@ -1,14 +1,9 @@
 import { getMessages } from '../utils/db'
+import { validate, messagesQuerySchema } from '../utils/validation'
 
 export default defineEventHandler(async (event) => {
-  const userId = getHeader(event, 'x-user-id')
-  if (!userId) throw createError({ statusCode: 401, message: 'Unauthorized' })
-
-  const query = getQuery(event)
-  const conversationId = query.conversation_id as string
-  if (!conversationId) throw createError({ statusCode: 400, message: 'conversation_id is required' })
-
-  const page = parseInt(query.page as string) || 1
-  const result = getMessages(conversationId, userId, page)
+  const userId = event.context.userId
+  const query = validate(messagesQuerySchema, getQuery(event))
+  const result = getMessages(query.conversation_id, userId, query.page)
   return result
 })

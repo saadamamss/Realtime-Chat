@@ -9,4 +9,7 @@ export default defineNuxtConfig({
       websocket: true,
     },
   },
+  runtimeConfig: {
+    jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
+  },
 })

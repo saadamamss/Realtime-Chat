@@ -1,17 +1,21 @@
-import type { AxiosInstance } from 'axios'
-
 declare module '#app' {
   interface NuxtApp {
-    $axios: AxiosInstance
+    $axios: {
+      get: <T = any>(url: string, config?: any) => Promise<{ data: T }>
+      post: <T = any>(url: string, data?: any, config?: any) => Promise<{ data: T }>
+    }
     $auth: {
       currentUser: { id: string; username: string; avatar: string } | null
-      login: (username: string, phoneNumber: string) => Promise<{ id: string; username: string; phone_number: string; avatar: string }>
-      logout: () => void
+      loggedIn: boolean
+      login: (username: string, phoneNumber: string, password: string, mode?: 'login' | 'register') => Promise<{ id: string; username: string; phone_number: string; avatar: string }>
+      logout: () => Promise<void>
+      fetchUser: () => Promise<void>
     }
     $ws: {
       connected: boolean
       onlineUsers: Set<string>
-      connect: (userId?: string) => void
+      connect: () => void
+      disconnect: () => void
       send: (data: Record<string, unknown>) => void
       onMessage: (callback: (data: any) => void) => void
       offMessage: (callback: (data: any) => void) => void
@@ -24,14 +28,15 @@ declare module '#app' {
 
 declare module 'vue' {
   interface ComponentCustomProperties {
-    $axios: AxiosInstance
     $auth: {
       currentUser: { id: string; username: string; avatar: string } | null
+      loggedIn: boolean
     }
     $ws: {
       connected: boolean
       onlineUsers: Set<string>
-      connect: (userId?: string) => void
+      connect: () => void
+      disconnect: () => void
       send: (data: Record<string, unknown>) => void
       onMessage: (callback: (data: any) => void) => void
       offMessage: (callback: (data: any) => void) => void

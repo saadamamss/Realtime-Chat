@@ -3,22 +3,14 @@ import axios from 'axios'
 export default defineNuxtPlugin(() => {
   const api = axios.create({
     baseURL: '/api',
+    withCredentials: true,
   })
 
   const state = reactive<{ user: { id: string; username: string; avatar: string } | null }>({
     user: null,
   })
 
-  if (process.client) {
-    const saved = localStorage.getItem('chat_user')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        state.user = parsed
-        api.defaults.headers.common['x-user-id'] = parsed.id
-      } catch {}
-    }
-  }
+  const loggedIn = computed(() => !!state.user)
 
   return {
     provide: {
@@ -27,20 +19,29 @@ export default defineNuxtPlugin(() => {
         get currentUser() {
           return state.user
         },
-        async login(username: string, phoneNumber: string) {
-          const { data } = await api.post('/auth/login', { username, phone_number: phoneNumber })
+        get loggedIn() {
+          return loggedIn.value
+        },
+        async login(username: string, phoneNumber: string, password: string, mode: 'login' | 'register' = 'login') {
+          const { data } = await api.post('/auth/login', {
+            username,
+            phone_number: phoneNumber,
+            password,
+            mode,
+          })
           state.user = data.user
-          api.defaults.headers.common['x-user-id'] = data.user.id
-          if (process.client) {
-            localStorage.setItem('chat_user', JSON.stringify(data.user))
-          }
           return data.user
         },
-        logout() {
+        async logout() {
+          await api.post('/auth/logout')
           state.user = null
-          delete api.defaults.headers.common['x-user-id']
-          if (process.client) {
-            localStorage.removeItem('chat_user')
+        },
+        async fetchUser() {
+          try {
+            const { data } = await api.get('/auth/me')
+            state.user = data.user
+          } catch {
+            state.user = null
           }
         },
       },

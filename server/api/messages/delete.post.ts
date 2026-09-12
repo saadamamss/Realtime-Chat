@@ -1,27 +1,19 @@
 import { deleteMessage, getConversationParticipantIds } from '../../utils/db'
 import { sendToUser } from '../../utils/ws'
+import { validate, deleteMessageSchema } from '../../utils/validation'
 
 export default defineEventHandler(async (event) => {
-  const userId = getHeader(event, 'x-user-id')
-  if (!userId) throw createError({ statusCode: 401, message: 'Unauthorized' })
-
+  const userId = event.context.userId
   const body = await readBody(event)
-  const { message_id, mode } = body
-  if (!message_id || !mode) throw createError({ statusCode: 400, message: 'message_id and mode are required' })
-  if (!['me', 'all'].includes(mode)) throw createError({ statusCode: 400, message: 'mode must be "me" or "all"' })
-
-  const conversationId = deleteMessage(message_id, userId, mode)
+  const input = validate(deleteMessageSchema, body)
+  const conversationId = deleteMessage(input.message_id, userId, input.mode)
   if (!conversationId) throw createError({ statusCode: 404, message: 'Message not found or not authorized' })
-
-  if (mode === 'all') {
-    const payload = JSON.stringify({ type: 'message-deleted', message_id, conversation_id: conversationId })
+  if (input.mode === 'all') {
+    const payload = JSON.stringify({ type: 'message-deleted', message_id: input.message_id, conversation_id: conversationId })
     const participantIds = getConversationParticipantIds(conversationId)
     for (const pid of participantIds) {
-      if (pid !== userId) {
-        sendToUser(pid, payload)
-      }
+      if (pid !== userId) sendToUser(pid, payload)
     }
   }
-
   return { success: true }
 })
