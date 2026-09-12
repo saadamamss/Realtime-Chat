@@ -52,6 +52,16 @@ export default defineWebSocketHandler({
             if (pid !== p.userId) sendToUser(pid, payload)
           }
         }
+      } else if (data.type === 'typing' && data.conversation_id) {
+        const payload = JSON.stringify({
+          type: 'typing',
+          conversation_id: data.conversation_id,
+          user_id: p.userId,
+        })
+        const pIds = getConversationParticipantIds(data.conversation_id)
+        for (const pid of pIds) {
+          if (pid !== p.userId) sendToUser(pid, payload)
+        }
       } else if (data.type === 'ping') {
         peer.send(JSON.stringify({ type: 'pong' }))
       }

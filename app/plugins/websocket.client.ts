@@ -4,9 +4,14 @@ export default defineNuxtPlugin(() => {
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+  let typingTimer: ReturnType<typeof setTimeout> | null = null
   let currentConversationId: string | null = null
   let currentToken: string | null = null
+  let reconnectAttempts = 0
   const messageHandlers: Set<(data: any) => void> = new Set()
+
+  const BASE_DELAY = 1000
+  const MAX_RECONNECT_DELAY = 30000
 
   const state = reactive<{ connected: boolean }>({
     connected: false,
@@ -33,6 +38,7 @@ export default defineNuxtPlugin(() => {
 
     ws.onopen = () => {
       state.connected = true
+      reconnectAttempts = 0
       if (currentToken) {
         send({ type: 'authenticate', token: currentToken })
       }
@@ -97,10 +103,15 @@ export default defineNuxtPlugin(() => {
 
   function scheduleReconnect() {
     if (reconnectTimer) return
+    const delay = Math.min(
+      BASE_DELAY * Math.pow(2, reconnectAttempts) + Math.random() * 1000,
+      MAX_RECONNECT_DELAY,
+    )
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null
+      reconnectAttempts++
       connect()
-    }, 3000)
+    }, delay)
   }
 
   function send(data: Record<string, unknown>) {
@@ -130,8 +141,17 @@ export default defineNuxtPlugin(() => {
     return onlineUsers.has(userId)
   }
 
+  function sendTyping(conversationId: string) {
+    if (typingTimer) return
+    send({ type: 'typing', conversation_id: conversationId })
+    typingTimer = setTimeout(() => {
+      typingTimer = null
+    }, 2000)
+  }
+
   function disconnect() {
     currentToken = null
+    reconnectAttempts = 999
     ws?.close()
     ws = null
   }
@@ -148,6 +168,7 @@ export default defineNuxtPlugin(() => {
         connect,
         disconnect,
         send,
+        sendTyping,
         onMessage,
         offMessage,
         joinConversation,

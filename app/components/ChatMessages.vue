@@ -67,6 +67,14 @@
         </div>
       </template>
 
+      <div v-if="typingUsers.size > 0" class="flex items-center gap-2 px-3 py-1">
+        <div class="flex gap-1">
+          <span class="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce" style="animation-delay: 0ms" />
+          <span class="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce" style="animation-delay: 150ms" />
+          <span class="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce" style="animation-delay: 300ms" />
+        </div>
+      </div>
+
       <div
         v-show="showFilePreview"
         class="absolute inset-0 bg-black/70 z-10 flex flex-col rounded-2xl"
@@ -184,7 +192,7 @@
           rows="1"
           class="flex-1 bg-blue-50 rounded-xl px-4 py-3 text-sm text-text-primary placeholder-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/40 resize-none border-2 border-blue-200 focus:border-blue-400 transition-colors max-h-[240px] overflow-y-auto"
           @keydown.enter="onEnterKey"
-          @input="autoResize"
+          @input="onTyping"
         />
 
         <button
@@ -261,6 +269,7 @@ const loadingOldMessages = ref(false)
 const hasMoreOldMessages = ref(false)
 const chatCurrentPage = ref(1)
 const scrollPositionBeforeLoad = ref(0)
+const typingUsers = ref<Set<string>>(new Set())
 
 const showDeleteDialog = ref(false)
 const deleteTargetMessage = ref<ChatMessage | null>(null)
@@ -326,6 +335,13 @@ function markReadLocally() {
 }
 
 function handleIncomingMessage(data: any) {
+  if (data.type === 'typing' && data.conversation_id === props.conversationId) {
+    typingUsers.value.add(data.user_id)
+    setTimeout(() => {
+      typingUsers.value.delete(data.user_id)
+    }, 3000)
+    return
+  }
   if (data.type === 'delivery-update' && data.message_id) {
     for (const d of Object.keys(chatData.value)) {
       const found = chatData.value[d]?.find((m: any) => m.rId === data.message_id)
@@ -439,6 +455,11 @@ function autoResize(e: Event) {
   const el = e.target as HTMLTextAreaElement
   el.style.height = 'auto'
   el.style.height = Math.min(el.scrollHeight, 240) + 'px'
+}
+
+function onTyping(e: Event) {
+  autoResize(e)
+  $ws.sendTyping(props.conversationId)
 }
 
 function onEnterKey(e: KeyboardEvent) {
@@ -738,7 +759,7 @@ async function retrySendMessage(message: ChatMessage) {
     pending.cancelTokenSource = new AbortController()
     const { status } = await $axios.post('/messages', formData, {
       signal: pending.cancelTokenSource.signal,
-      onUploadProgress: ({ progress, loaded, total }) => {
+      onUploadProgress: ({ progress, loaded, total }: { progress?: number; loaded: number; total?: number }) => {
         if (progress) pending.progress = Math.round(progress * 100)
         else if (total) pending.progress = Math.round((loaded / total) * 100)
       },

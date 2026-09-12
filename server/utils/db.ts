@@ -79,6 +79,9 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_rId ON messages(rId);
     CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone_number);
+    CREATE INDEX IF NOT EXISTS idx_cp_user ON conversation_participants(user_id);
+    CREATE INDEX IF NOT EXISTS idx_contacts_user ON contacts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
   `)
 
   migrateV1()
@@ -263,7 +266,8 @@ export function getMessages(conversationId: string, userId: string, page: number
   const db = getDb()
   const offset = (page - 1) * perPage
   const rows = db.prepare(`
-    SELECT m.*, u.username as sender_name, u.avatar as sender_avatar
+    SELECT m.*, u.username as sender_name, u.avatar as sender_avatar,
+      COUNT(*) OVER() as total_count
     FROM messages m
     JOIN users u ON m.sender_id = u.id
     LEFT JOIN conversation_participants cp ON cp.conversation_id = m.conversation_id AND cp.user_id = ?
@@ -275,16 +279,9 @@ export function getMessages(conversationId: string, userId: string, page: number
     LIMIT ? OFFSET ?
   `).all(userId, userId, conversationId, perPage, offset) as any[]
 
-  const total = (db.prepare(`
-    SELECT COUNT(*) as count
-    FROM messages m
-    LEFT JOIN conversation_participants cp ON cp.conversation_id = m.conversation_id AND cp.user_id = ?
-    LEFT JOIN message_deletions md ON md.message_rId = m.rId AND md.user_id = ?
-    WHERE m.conversation_id = ?
-      AND (cp.deleted_at IS NULL OR m.created_at > cp.deleted_at)
-      AND md.user_id IS NULL
-  `).get(userId, userId, conversationId) as any).count
+  const total = rows.length > 0 ? Number(rows[0].total_count) : 0
   const lastPage = Math.ceil(total / perPage)
+  for (const row of rows) delete row.total_count
 
   const replyRIds = rows.filter((r: any) => r.reply_to_rId).map((r: any) => r.reply_to_rId).filter(Boolean)
   const replyMap: Record<string, any> = {}
@@ -371,28 +368,31 @@ export function getConversations(userId: string) {
     SELECT c.id, c.name, c.created_at,
       (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
       (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_at,
-      (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_id != ? AND m.read_at IS NULL) as unread_count
+      (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_id != ? AND m.read_at IS NULL) as unread_count,
+      (SELECT json_object(
+        'id', u.id,
+        'name', u.username,
+        'phone_number', u.phone_number,
+        'image', u.avatar
+      )
+      FROM conversation_participants cp2
+      JOIN users u ON u.id = cp2.user_id
+      WHERE cp2.conversation_id = c.id AND cp2.user_id != ?
+      LIMIT 1
+      ) as other_participant_json
     FROM conversations c
     JOIN conversation_participants cp ON c.id = cp.conversation_id
     WHERE cp.user_id = ? AND cp.hidden = 0
       AND (EXISTS (SELECT 1 FROM messages WHERE conversation_id = c.id LIMIT 1) OR c.created_by = ?)
     ORDER BY last_message_at DESC
-  `).all(userId, userId, userId) as any[]
-
-  const stmt = db.prepare(`
-    SELECT u.id, u.username as name, u.phone_number, u.avatar as image
-    FROM conversation_participants cp
-    JOIN users u ON u.id = cp.user_id
-    WHERE cp.conversation_id = ? AND cp.user_id != ?
-    LIMIT 1
-  `)
+  `).all(userId, userId, userId, userId) as any[]
 
   return rows.map((row) => {
-    const other = stmt.get(row.id, userId) as any
-    return {
-      ...row,
-      other_participant: other || null,
+    let other = null
+    if (row.other_participant_json) {
+      try { other = JSON.parse(row.other_participant_json) } catch { other = null }
     }
+    return { ...row, other_participant: other }
   })
 }
 

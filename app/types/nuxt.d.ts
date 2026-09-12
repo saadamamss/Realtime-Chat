@@ -1,8 +1,9 @@
 declare module '#app' {
   interface NuxtApp {
     $axios: {
-      get: <T = any>(url: string, config?: any) => Promise<{ data: T }>
-      post: <T = any>(url: string, data?: any, config?: any) => Promise<{ data: T }>
+      get: <T = any>(url: string, config?: any) => Promise<{ data: T; status: number }>
+      post: <T = any>(url: string, data?: any, config?: any) => Promise<{ data: T; status: number }>
+      delete: <T = any>(url: string, config?: any) => Promise<{ data: T; status: number }>
     }
     $auth: {
       currentUser: { id: string; username: string; avatar: string } | null
@@ -17,6 +18,7 @@ declare module '#app' {
       connect: () => void
       disconnect: () => void
       send: (data: Record<string, unknown>) => void
+      sendTyping: (conversationId: string) => void
       onMessage: (callback: (data: any) => void) => void
       offMessage: (callback: (data: any) => void) => void
       joinConversation: (conversationId: string) => void
@@ -38,6 +40,7 @@ declare module 'vue' {
       connect: () => void
       disconnect: () => void
       send: (data: Record<string, unknown>) => void
+      sendTyping: (conversationId: string) => void
       onMessage: (callback: (data: any) => void) => void
       offMessage: (callback: (data: any) => void) => void
       joinConversation: (conversationId: string) => void

@@ -24,6 +24,7 @@ export interface ReplyTo {
   rId: string
   sender: { id: string; name: string }
   content: string
+  file?: string
 }
 
 export interface ChatMessage {

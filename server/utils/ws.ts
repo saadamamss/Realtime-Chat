@@ -1,6 +1,7 @@
 let allPeers: Set<any> = new Set()
 const userIdByPeer = new Map<any, string>()
 const peerByUserId = new Map<string, any>()
+const conversationPeers = new Map<string, Set<any>>()
 
 export function registerPeer(peer: any) {
   allPeers.add(peer)
@@ -12,6 +13,9 @@ export function unregisterPeer(peer: any) {
   if (userId) {
     userIdByPeer.delete(peer)
     peerByUserId.delete(userId)
+    for (const peers of conversationPeers.values()) {
+      peers.delete(peer)
+    }
     broadcastToAll(JSON.stringify({ type: 'user-offline', userId }))
   }
 }
@@ -37,20 +41,29 @@ export function isUserOnline(userId: string) {
 
 export function subscribeToConversation(peer: any, conversationId: string) {
   peer.subscribe(conversationId)
+  if (!conversationPeers.has(conversationId)) {
+    conversationPeers.set(conversationId, new Set())
+  }
+  conversationPeers.get(conversationId)!.add(peer)
 }
 
 export function unsubscribeFromConversation(peer: any, conversationId: string) {
   peer.unsubscribe(conversationId)
+  const peers = conversationPeers.get(conversationId)
+  if (peers) {
+    peers.delete(peer)
+    if (peers.size === 0) conversationPeers.delete(conversationId)
+  }
 }
 
 export function broadcastToConversation(conversationId: string, message: string) {
-  for (const peer of allPeers) {
-    if (peer.topics?.has(conversationId)) {
-      try {
-        peer.send(message)
-      } catch {
-        allPeers.delete(peer)
-      }
+  const peers = conversationPeers.get(conversationId)
+  if (!peers) return
+  for (const peer of peers) {
+    try {
+      peer.send(message)
+    } catch {
+      peers.delete(peer)
     }
   }
 }
@@ -58,7 +71,8 @@ export function broadcastToConversation(conversationId: string, message: string)
 export function isUserSubscribed(userId: string, conversationId: string) {
   const peer = peerByUserId.get(userId)
   if (!peer) return false
-  return peer.topics?.has(conversationId) || false
+  const peers = conversationPeers.get(conversationId)
+  return peers?.has(peer) || false
 }
 
 export function sendToUser(userId: string, message: string) {
