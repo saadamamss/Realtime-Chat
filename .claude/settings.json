@@ -1,8 +1,7 @@
 {
   "env": {
-    "ANTHROPIC_BASE_URL": "http://localhost:6446",
-    "ANTHROPIC_AUTH_TOKEN": "oc-6f27e12b4ba71d2963f58c16a2a2c4fd305a06da",
-    "ANTHROPIC_MODEL": "deepseek-v4-flash-free"
-    
+    "ANTHROPIC_BASE_URL": "https://zenmux.ai/api/anthropic",
+    "ANTHROPIC_API_KEY": "sk-ai-v1-63335679a53e073de0bc32f92d018792328e8220332d3be81eaa7e11157516e5",
+    "ANTHROPIC_MODEL": "z-ai/glm-4.7-flash-free"
   }
 }

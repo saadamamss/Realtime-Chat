@@ -29,7 +29,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Invalid file path' })
   }
 
-  const fullPath = path.join(UPLOAD_DIR, urlPath)
+  const filename = urlPath.replace(/^uploads\//, '')
+  const fullPath = path.join(UPLOAD_DIR, filename)
   if (!fs.existsSync(fullPath)) {
     throw createError({ statusCode: 404, message: 'File not found' })
   }

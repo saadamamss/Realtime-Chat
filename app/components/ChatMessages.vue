@@ -1,19 +1,19 @@
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex flex-col flex-1 min-h-0 relative">
     <div
       ref="messagesContainer"
       class="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-chat-bg scroll-smooth relative"
       @scroll="handleMessageContainerScroll"
     >
       <div
-        v-if="loadingLastMessages"
+        v-if="chatStore.loadingLastMessages"
         class="flex items-center justify-center py-12"
       >
         <UIcon name="ph-circle-notch" class="w-6 h-6 text-accent animate-spin" />
       </div>
 
       <div
-        v-else-if="sortedDates.length === 0"
+        v-else-if="chatStore.sortedDates.length === 0"
         class="flex flex-col items-center justify-center py-12 text-text-secondary"
       >
         <UIcon name="ph-chat-teardrop-text" class="w-12 h-12 mb-3 opacity-40" />
@@ -22,11 +22,11 @@
       </div>
 
       <template v-else>
-        <div v-if="loadingOldMessages" class="flex justify-center py-2">
+        <div v-if="chatStore.loadingOldMessages" class="flex justify-center py-2">
           <UIcon name="ph-circle-notch" class="w-5 h-5 text-text-secondary animate-spin" />
         </div>
 
-        <div v-for="date in sortedDates" :key="date">
+        <div v-for="date in chatStore.sortedDates" :key="date">
           <div class="flex justify-center my-4">
             <span class="text-[11px] font-medium text-text-secondary bg-surface px-3 py-1 rounded-full shadow-xs">
               {{ chatDateFormat(date) }}
@@ -34,84 +34,84 @@
           </div>
 
           <div
-            v-for="message in chatData[date]"
+            v-for="message in chatStore.chatData[date]"
             :key="message.rId"
           >
             <div
-              v-if="unreadBadgeCount > 0 && firstUnreadRId === message.rId"
+              v-if="chatStore.unreadBadgeCount > 0 && firstUnreadRId === message.rId"
               class="flex justify-center my-4"
             >
               <span class="text-[11px] font-medium text-white bg-danger px-3 py-1 rounded-full shadow-xs">
-                {{ unreadBadgeCount }} unread message{{ unreadBadgeCount > 1 ? 's' : '' }}
+                {{ chatStore.unreadBadgeCount }} unread message{{ chatStore.unreadBadgeCount > 1 ? 's' : '' }}
               </span>
             </div>
             <div
               class="flex mb-3"
-              :class="message.sender.id === $auth.currentUser?.id ? 'justify-end' : 'justify-start'"
+              :class="message.sender.id === authStore.currentUser?.id ? 'justify-end' : 'justify-start'"
             >
               <ChatMessageCard
               :message="message"
-              :direction="message.sender.id === $auth.currentUser?.id ? 'outbound' : 'inbound'"
+              :direction="message.sender.id === authStore.currentUser?.id ? 'outbound' : 'inbound'"
               @file-preview="openFilePreview"
               @file-download="downloadFile"
               @retry-send-message="retrySendMessage"
               @delete-message="openDeleteDialog"
               @reply-message="startReply"
               @scroll-to-message="scrollToMessage"
-              :status="(pendingMessages[message.rId]?.status as 'sending' | 'sent' | 'failed') || message.status || 'sent'"
-              :progress="pendingMessages[message.rId]?.progress || 0"
-              :cancelTokenSource="pendingMessages[message.rId]?.cancelTokenSource || null"
+              :status="(chatStore.pendingMessages[message.rId]?.status as 'sending' | 'sent' | 'failed') || message.status || 'sent'"
+              :progress="chatStore.pendingMessages[message.rId]?.progress || 0"
+              :cancelTokenSource="chatStore.pendingMessages[message.rId]?.cancelTokenSource || null"
             />
           </div>
           </div>
         </div>
       </template>
 
-      <div v-if="typingUsers.size > 0" class="flex items-center gap-2 px-3 py-1">
+      <div v-if="chatStore.typingUsers.size > 0" class="flex items-center gap-2 px-3 py-1">
         <div class="flex gap-1">
           <span class="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce" style="animation-delay: 0ms" />
           <span class="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce" style="animation-delay: 150ms" />
           <span class="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce" style="animation-delay: 300ms" />
         </div>
       </div>
+    </div>
 
-      <div
-        v-show="showFilePreview"
-        class="absolute inset-0 bg-black/70 z-10 flex flex-col rounded-2xl"
-      >
-        <div class="flex justify-end p-2">
-          <button
-            @click="showFilePreview = false"
-            class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors cursor-pointer"
-          >
-            <UIcon name="ph-x" class="w-5 h-5 text-white" />
-          </button>
-        </div>
-        <div class="flex-1 flex items-center justify-center p-4">
-          <img
-            v-if="previewedFileExt && isImageFile(getFileExtension(previewedFileExt))"
-            :src="previewedFile"
-            alt="Preview"
-            class="max-w-full max-h-full object-contain rounded-xl"
-          />
-          <video
-            v-else-if="previewedFileExt && isVideoFile(getFileExtension(previewedFileExt))"
-            :src="previewedFile"
-            controls
-            autoplay
-            class="max-w-full max-h-full rounded-xl"
-          >
-            Your browser does not support the video tag.
-          </video>
-          <audio
-            v-else-if="previewedFileExt && isAudioFile(getFileExtension(previewedFileExt))"
-            :src="previewedFile"
-            controls
-            class="w-full max-w-sm"
-          >
-            Your browser does not support the audio tag.
-          </audio>
-        </div>
+    <div
+      v-show="showFilePreview"
+      class="absolute inset-0 bg-black/70 z-10 flex flex-col rounded-2xl"
+    >
+      <div class="flex justify-end p-2">
+        <button
+          @click="showFilePreview = false"
+          class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors cursor-pointer"
+        >
+          <UIcon name="ph-x" class="w-5 h-5 text-white" />
+        </button>
+      </div>
+      <div class="flex-1 flex items-center justify-center p-4">
+        <img
+          v-if="previewedFileExt && isImageFile(getFileExtension(previewedFileExt))"
+          :src="previewedFile"
+          alt="Preview"
+          class="max-w-full max-h-full object-contain rounded-xl"
+        />
+        <video
+          v-else-if="previewedFileExt && isVideoFile(getFileExtension(previewedFileExt))"
+          :src="previewedFile"
+          controls
+          autoplay
+          class="max-w-full max-h-full rounded-xl"
+        >
+          Your browser does not support the video tag.
+        </video>
+        <audio
+          v-else-if="previewedFileExt && isAudioFile(getFileExtension(previewedFileExt))"
+          :src="previewedFile"
+          controls
+          class="w-full max-w-sm"
+        >
+          Your browser does not support the audio tag.
+        </audio>
       </div>
     </div>
 
@@ -243,13 +243,20 @@
 
 <script setup lang="ts">
 import { useAppToast } from '../composables/useAppToast'
-import type { ChatData, ChatMessage, FilePreview, ChatUser } from '../types'
+import { useAuthStore } from '../stores/auth'
+import { useChatStore } from '../stores/chat'
+import { useWsStore } from '../stores/ws'
+import type { ChatData, ChatMessage, FilePreview, ChatUser, PendingUpload, SocketMessage } from '../types'
 
-const { $axios, $auth, $ws } = useNuxtApp()
+const { $axios } = useNuxtApp()
+const authStore = useAuthStore()
+const chatStore = useChatStore()
+const wsStore = useWsStore()
 const toast = useAppToast()
 
 const props = defineProps<{ conversationId: string }>()
 const emit = defineEmits<{ (e: 'loaded'): void }>()
+
 const showAttachMenu = ref(false)
 const newMessage = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -262,22 +269,12 @@ const previewedFileExt = ref<string | undefined>(undefined)
 const isRecording = ref(false)
 const recordingTime = ref('0:00')
 
-const chatData = ref<ChatData>({})
-const pendingMessages = ref<Record<string, { status: string; progress: number; cancelTokenSource: AbortController; file: File | null }>>({})
-const loadingLastMessages = ref(false)
-const loadingOldMessages = ref(false)
-const hasMoreOldMessages = ref(false)
-const chatCurrentPage = ref(1)
-const scrollPositionBeforeLoad = ref(0)
-const typingUsers = ref<Set<string>>(new Set())
-
 const showDeleteDialog = ref(false)
 const deleteTargetMessage = ref<ChatMessage | null>(null)
 const deleteMode = ref<'me' | 'all'>('me')
-const canDeleteForAll = computed(() => deleteTargetMessage.value?.sender.id === $auth.currentUser?.id)
+const canDeleteForAll = computed(() => deleteTargetMessage.value?.sender.id === authStore.currentUser?.id)
 
 const replyingTo = ref<ChatMessage | null>(null)
-const unreadBadgeCount = ref(0)
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
@@ -286,19 +283,13 @@ let audioChunks: Blob[] = []
 let recordingInterval: ReturnType<typeof setInterval> | null = null
 let recordingStartTime: number | null = null
 
-const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp']
-const VIDEO_EXTENSIONS = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv']
-const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac']
-
-const sortedDates = computed(() => {
-  if (!chatData.value) return []
-  return Object.keys(chatData.value).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
-})
+import { isImageFile, isVideoFile, isAudioFile, getFileIcon, getFileExtension, getFileName } from '../utils/fileType'
+import { formatFileSize, chatDateFormat } from '../utils/format'
 
 const firstUnreadRId = computed(() => {
-  for (const date of sortedDates.value) {
-    for (const msg of chatData.value[date] || []) {
-      if (msg.sender.id !== $auth.currentUser?.id && !msg.read_at) {
+  for (const date of chatStore.sortedDates) {
+    for (const msg of chatStore.chatData[date] || []) {
+      if (msg.sender.id !== authStore.currentUser?.id && !msg.read_at) {
         return msg.rId
       }
     }
@@ -308,9 +299,9 @@ const firstUnreadRId = computed(() => {
 
 const unreadMessageCount = computed(() => {
   let count = 0
-  for (const date of sortedDates.value) {
-    for (const msg of chatData.value[date] || []) {
-      if (msg.sender.id !== $auth.currentUser?.id && !msg.read_at) {
+  for (const date of chatStore.sortedDates) {
+    for (const msg of chatStore.chatData[date] || []) {
+      if (msg.sender.id !== authStore.currentUser?.id && !msg.read_at) {
         count++
       }
     }
@@ -320,31 +311,31 @@ const unreadMessageCount = computed(() => {
 
 function sendReadAck() {
   if (!props.conversationId) return
-  $ws.send({ type: 'messages-read', conversation_id: props.conversationId })
+  wsStore.send({ type: 'messages-read', conversation_id: props.conversationId })
 }
 
 function markReadLocally() {
   const now = new Date().toISOString()
-  for (const d of Object.keys(chatData.value)) {
-    for (const m of chatData.value[d] || []) {
-      if (m.sender.id !== $auth.currentUser?.id && !m.read_at) {
+  for (const d of Object.keys(chatStore.chatData)) {
+    for (const m of chatStore.chatData[d] || []) {
+      if (m.sender.id !== authStore.currentUser?.id && !m.read_at) {
         m.read_at = now
       }
     }
   }
 }
 
-function handleIncomingMessage(data: any) {
+function handleIncomingMessage(data: SocketMessage) {
   if (data.type === 'typing' && data.conversation_id === props.conversationId) {
-    typingUsers.value.add(data.user_id)
+    chatStore.typingUsers.add(data.user_id!)
     setTimeout(() => {
-      typingUsers.value.delete(data.user_id)
+      chatStore.typingUsers.delete(data.user_id!)
     }, 3000)
     return
   }
   if (data.type === 'delivery-update' && data.message_id) {
-    for (const d of Object.keys(chatData.value)) {
-      const found = chatData.value[d]?.find((m: any) => m.rId === data.message_id)
+    for (const d of Object.keys(chatStore.chatData)) {
+      const found = chatStore.chatData[d]?.find((m: any) => m.rId === data.message_id)
       if (found) {
         found.delivered_at = new Date().toISOString()
         break
@@ -355,9 +346,9 @@ function handleIncomingMessage(data: any) {
   if (data.type === 'read-update' && data.conversation_id) {
     if (data.conversation_id === props.conversationId) {
       const now = new Date().toISOString()
-      for (const d of Object.keys(chatData.value)) {
-        for (const m of chatData.value[d] || []) {
-          if (m.sender.id === $auth.currentUser?.id && !m.read_at) {
+      for (const d of Object.keys(chatStore.chatData)) {
+        for (const m of chatStore.chatData[d] || []) {
+          if (m.sender.id === authStore.currentUser?.id && !m.read_at) {
             m.read_at = now
           }
         }
@@ -372,10 +363,10 @@ function handleIncomingMessage(data: any) {
   if (data.type === 'new-message' && data.message) {
     const msg = data.message
 
-    if (pendingMessages.value[msg.rId]) {
-      delete pendingMessages.value[msg.rId]
-      for (const d of Object.keys(chatData.value)) {
-        const found = chatData.value[d]?.find((m: any) => m.rId === msg.rId)
+    if (chatStore.pendingMessages[msg.rId]) {
+      delete chatStore.pendingMessages[msg.rId]
+      for (const d of Object.keys(chatStore.chatData)) {
+        const found = chatStore.chatData[d]?.find((m: any) => m.rId === msg.rId)
         if (found) {
           found.status = 'sent'
           found.reply_to = msg.reply_to
@@ -393,62 +384,21 @@ function handleIncomingMessage(data: any) {
 
     if (data.conversation_id !== props.conversationId) return
 
-    const date = msg.created_at.includes('T')
+    const date = (msg.created_at.includes('T')
       ? msg.created_at.split('T')[0]
-      : msg.created_at.split(' ')[0]
-    if (!chatData.value[date]) chatData.value[date] = []
-    const exists = chatData.value[date].some((m: any) => m.rId === msg.rId)
+      : msg.created_at.split(' ')[0]) as string
+    if (!chatStore.chatData[date]) chatStore.chatData[date] = []
+    const exists = chatStore.chatData[date]!.some((m: any) => m.rId === msg.rId)
     if (!exists) {
-      chatData.value[date]!.push(msg)
-      if (msg.sender?.id !== $auth.currentUser?.id) {
-        unreadBadgeCount.value = 0
+      chatStore.chatData[date]!.push(msg)
+      if (msg.sender?.id !== authStore.currentUser?.id) {
+        chatStore.unreadBadgeCount = 0
         markReadLocally()
         nextTick(() => sendReadAck())
       }
       nextTick(() => scrollToBottom())
     }
   }
-}
-
-const getFileExtension = (filename: string) => filename.split('.').pop()?.toLowerCase() || ''
-
-const isImageFile = (ext: string | undefined) => ext ? IMAGE_EXTENSIONS.includes(ext.toLowerCase()) : false
-const isVideoFile = (ext: string | undefined) => ext ? VIDEO_EXTENSIONS.includes(ext.toLowerCase()) : false
-const isAudioFile = (ext: string | undefined) => ext ? AUDIO_EXTENSIONS.includes(ext.toLowerCase()) : false
-
-const getFileIcon = (ext: string | undefined) => {
-  const map: Record<string, string> = {
-    pdf: 'ph-file-pdf', doc: 'ph-file-text', docx: 'ph-file-text',
-    xls: 'ph-file-spreadsheet', xlsx: 'ph-file-spreadsheet',
-    ppt: 'ph-file-presentation', pptx: 'ph-file-presentation',
-    jpg: 'ph-image', webp: 'ph-image', jpeg: 'ph-image', png: 'ph-image',
-    gif: 'ph-image', svg: 'ph-image', bmp: 'ph-image',
-    mp3: 'ph-music-note', wav: 'ph-music-note', ogg: 'ph-music-note',
-    m4a: 'ph-music-note', aac: 'ph-music-note', flac: 'ph-music-note',
-    mp4: 'ph-video', avi: 'ph-video', mov: 'ph-video',
-    wmv: 'ph-video', webm: 'ph-video', mkv: 'ph-video',
-    zip: 'ph-archive', rar: 'ph-archive',
-  }
-  return (ext && map[ext.toLowerCase()]) || 'ph-file'
-}
-
-const getFileName = (fp: string) => fp.split('/').pop() || 'file'
-
-const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const s = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${s[i]}`
-}
-
-const chatDateFormat = (date: string) => {
-  const d = new Date(date)
-  const today = new Date()
-  if (d.toDateString() === today.toDateString()) return 'Today'
-  const y = new Date(today); y.setDate(y.getDate() - 1)
-  if (d.toDateString() === y.toDateString()) return 'Yesterday'
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function autoResize(e: Event) {
@@ -459,7 +409,7 @@ function autoResize(e: Event) {
 
 function onTyping(e: Event) {
   autoResize(e)
-  $ws.sendTyping(props.conversationId)
+  wsStore.sendTyping(props.conversationId)
 }
 
 function onEnterKey(e: KeyboardEvent) {
@@ -478,7 +428,7 @@ function scrollToBottom() {
 
 function openDeleteDialog(message: ChatMessage) {
   deleteTargetMessage.value = message
-  deleteMode.value = message.sender.id === $auth.currentUser?.id ? 'all' : 'me'
+  deleteMode.value = message.sender.id === authStore.currentUser?.id ? 'all' : 'me'
   showDeleteDialog.value = true
 }
 
@@ -490,13 +440,13 @@ async function confirmDelete() {
       message_id: msg.rId,
       mode: deleteMode.value,
     })
-    for (const date of Object.keys(chatData.value)) {
-      const arr = chatData.value[date]
+    for (const date of Object.keys(chatStore.chatData)) {
+      const arr = chatStore.chatData[date]
       if (arr) {
         const idx = arr.findIndex((m) => m.rId === msg.rId)
         if (idx !== -1) {
           arr.splice(idx, 1)
-          if (arr.length === 0) delete chatData.value[date]
+          if (arr.length === 0) delete chatStore.chatData[date]
           break
         }
       }
@@ -509,13 +459,13 @@ async function confirmDelete() {
 }
 
 function removeMessageFromChatData(messageId: string) {
-  for (const date of Object.keys(chatData.value)) {
-    const arr = chatData.value[date]
+  for (const date of Object.keys(chatStore.chatData)) {
+    const arr = chatStore.chatData[date]
     if (arr) {
       const idx = arr.findIndex((m) => m.rId === messageId)
       if (idx !== -1) {
         arr.splice(idx, 1)
-        if (arr.length === 0) delete chatData.value[date]
+        if (arr.length === 0) delete chatStore.chatData[date]
         break
       }
     }
@@ -605,42 +555,41 @@ function stopRecording() {
 }
 
 async function getUserChatMessages() {
-  if (Object.keys(chatData.value).length && !hasMoreOldMessages.value) return
+  if (Object.keys(chatStore.chatData).length && !chatStore.hasMoreOldMessages) return
   try {
-    if (hasMoreOldMessages.value) loadingOldMessages.value = true
-    else loadingLastMessages.value = true
+    if (chatStore.hasMoreOldMessages) chatStore.loadingOldMessages = true
+    else chatStore.loadingLastMessages = true
 
     const { data } = await $axios.get('/messages', {
-      params: { conversation_id: props.conversationId, page: chatCurrentPage.value },
+      params: { conversation_id: props.conversationId, page: chatStore.chatCurrentPage },
     })
 
-    if (Object.keys(chatData.value).length > 0) {
+    if (Object.keys(chatStore.chatData).length > 0) {
       for (const [date, msgs] of Object.entries(data.data)) {
-        chatData.value[date] = chatData.value[date]
-          ? [...(msgs as any[]), ...chatData.value[date]]
+        chatStore.chatData[date] = chatStore.chatData[date]
+          ? [...(msgs as any[]), ...chatStore.chatData[date]]
           : (msgs as any[])
       }
     } else {
-      chatData.value = data.data
+      chatStore.chatData = data.data
     }
 
-    // Mark own messages as sent
-    for (const date of Object.keys(chatData.value)) {
-      for (const msg of chatData.value[date]!) {
-        if (pendingMessages.value[msg.rId]) {
-          delete pendingMessages.value[msg.rId]
+    for (const date of Object.keys(chatStore.chatData)) {
+      for (const msg of chatStore.chatData[date]!) {
+        if (chatStore.pendingMessages[msg.rId]) {
+          delete chatStore.pendingMessages[msg.rId]
           msg.status = 'sent'
         }
       }
     }
 
-    hasMoreOldMessages.value = chatCurrentPage.value < data.last_page
-    if (hasMoreOldMessages.value) chatCurrentPage.value++
+    chatStore.hasMoreOldMessages = chatStore.chatCurrentPage < data.last_page
+    if (chatStore.hasMoreOldMessages) chatStore.chatCurrentPage++
   } catch (error) {
     toast.error({ title: 'Failed to load messages' })
   } finally {
-    loadingOldMessages.value = false
-    loadingLastMessages.value = false
+    chatStore.loadingOldMessages = false
+    chatStore.loadingLastMessages = false
   }
 }
 
@@ -652,8 +601,8 @@ async function sendMessage() {
     return
   }
 
-  if (unreadBadgeCount.value > 0) {
-    unreadBadgeCount.value = 0
+  if (chatStore.unreadBadgeCount > 0) {
+    chatStore.unreadBadgeCount = 0
     markReadLocally()
     sendReadAck()
   }
@@ -667,9 +616,9 @@ async function sendMessage() {
     rId: tempId,
     id: Date.now(),
     sender: {
-      id: $auth.currentUser?.id || '',
-      name: $auth.currentUser?.username || 'You',
-      image: $auth.currentUser?.avatar || '',
+      id: authStore.currentUser?.id || '',
+      name: authStore.currentUser?.username || 'You',
+      image: authStore.currentUser?.avatar || '',
     },
     direction: 'outbound',
     content,
@@ -688,11 +637,11 @@ async function sendMessage() {
     status: 'sending',
   }
 
-  if (!chatData.value[today]) chatData.value[today] = []
-  chatData.value[today].push(optimistic)
+  if (!chatStore.chatData[today]) chatStore.chatData[today] = []
+  chatStore.chatData[today].push(optimistic)
 
   const controller = new AbortController()
-  pendingMessages.value[tempId] = { status: 'sending', progress: 0, cancelTokenSource: controller, file: fileValue.value }
+  chatStore.pendingMessages[tempId] = { status: 'sending', progress: 0, cancelTokenSource: controller, file: fileValue.value }
 
   newMessage.value = ''
   scrollToBottom()
@@ -714,29 +663,36 @@ async function sendMessage() {
 
     clearFilePreview()
 
-    const { status } = await $axios.post('/messages', formData, {
+    const { data: resData, status } = await $axios.post('/messages', formData, {
       signal: controller.signal,
       onUploadProgress: ({ progress, loaded, total }: any) => {
-        if (progress && pendingMessages.value[tempId]) pendingMessages.value[tempId]!.progress = Math.round(progress * 100)
-        else if (total && pendingMessages.value[tempId]) pendingMessages.value[tempId]!.progress = Math.round((loaded / total) * 100)
+        if (progress && chatStore.pendingMessages[tempId]) chatStore.pendingMessages[tempId]!.progress = Math.round(progress * 100)
+        else if (total && chatStore.pendingMessages[tempId]) chatStore.pendingMessages[tempId]!.progress = Math.round((loaded / total) * 100)
       },
     })
 
     if (status === 201) {
-      delete pendingMessages.value[tempId]
+      if (resData.message?.file) {
+        optimistic.file = resData.message.file
+        optimistic.file_extension = resData.message.file_extension || optimistic.file_extension
+        optimistic.file_size = resData.message.file_size || optimistic.file_size
+      }
+      delete chatStore.pendingMessages[tempId]
       optimistic.status = 'sent'
     }
   } catch (err: any) {
+    if (chatStore.pendingMessages[tempId]) {
+      chatStore.pendingMessages[tempId].status = 'failed'
+    }
+    optimistic.status = 'failed'
     if (err.name !== 'CanceledError') {
-      pendingMessages.value[tempId].status = 'failed'
-      optimistic.status = 'failed'
       toast.error({ title: 'Failed to send message', description: err?.response?.data?.message })
     }
   }
 }
 
 async function retrySendMessage(message: ChatMessage) {
-  const pending = pendingMessages.value[message.rId]
+  const pending = chatStore.pendingMessages[message.rId]
   if (!pending) return
 
   pending.status = 'sending'
@@ -757,7 +713,7 @@ async function retrySendMessage(message: ChatMessage) {
     }
 
     pending.cancelTokenSource = new AbortController()
-    const { status } = await $axios.post('/messages', formData, {
+    const { data: resData, status } = await $axios.post('/messages', formData, {
       signal: pending.cancelTokenSource.signal,
       onUploadProgress: ({ progress, loaded, total }: { progress?: number; loaded: number; total?: number }) => {
         if (progress) pending.progress = Math.round(progress * 100)
@@ -766,27 +722,34 @@ async function retrySendMessage(message: ChatMessage) {
     })
 
     if (status === 201) {
-      delete pendingMessages.value[message.rId]
+      if (resData.message?.file) {
+        message.file = resData.message.file
+        message.file_extension = resData.message.file_extension || message.file_extension
+        message.file_size = resData.message.file_size || message.file_size
+      }
+      delete chatStore.pendingMessages[message.rId]
       message.status = 'sent'
     }
   } catch (err: any) {
     pending.status = 'failed'
-    toast.error({ title: 'Failed to send message', description: err?.response?.data?.message })
+    if (err.name !== 'CanceledError') {
+      toast.error({ title: 'Failed to send message', description: err?.response?.data?.message })
+    }
   }
 }
 
 const handleMessageContainerScroll = async () => {
   if (messagesContainer.value?.scrollTop === 0) {
-    scrollPositionBeforeLoad.value = messagesContainer.value.scrollHeight - messagesContainer.value.scrollTop
+    chatStore.scrollPositionBeforeLoad = messagesContainer.value.scrollHeight - messagesContainer.value.scrollTop
     await getUserChatMessages()
     await nextTick()
     if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight - scrollPositionBeforeLoad.value
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight - chatStore.scrollPositionBeforeLoad
     }
   }
 }
 
-$ws.onMessage(handleIncomingMessage)
+wsStore.onMessage(handleIncomingMessage)
 
 watch(messagesContainer, () => {
   if (messagesContainer.value) {
@@ -795,23 +758,21 @@ watch(messagesContainer, () => {
 })
 
 onUnmounted(() => {
-  $ws.offMessage(handleIncomingMessage)
+  wsStore.offMessage(handleIncomingMessage)
   if (props.conversationId) {
-    $ws.leaveConversation(props.conversationId)
+    wsStore.leaveConversation(props.conversationId)
   }
 })
 
 watch(() => props.conversationId, async (newId, oldId) => {
-  if (oldId) $ws.leaveConversation(oldId)
-  chatData.value = {}
-  chatCurrentPage.value = 1
-  hasMoreOldMessages.value = false
-  $ws.joinConversation(newId)
+  if (oldId) wsStore.leaveConversation(oldId)
+  chatStore.resetChatData()
+  wsStore.joinConversation(newId)
   await getUserChatMessages()
   await nextTick()
   scrollToBottom()
   sendReadAck()
-  unreadBadgeCount.value = unreadMessageCount.value
+  chatStore.unreadBadgeCount = unreadMessageCount.value
   emit('loaded')
 }, { immediate: true })
 </script>

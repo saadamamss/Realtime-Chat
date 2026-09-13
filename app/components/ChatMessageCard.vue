@@ -114,12 +114,14 @@
         </div>
 
         <div v-else-if="isAudioFile(message.file_extension)" class="min-w-[200px]">
-          <audio ref="audioPlayer" :src="message.file" class="hidden"
+          <audio ref="audioPlayer" :key="message.file" :src="message.file" class="hidden"
             @loadedmetadata="onAudioLoaded"
+            @durationchange="onDurationChange"
+            @canplay="onAudioLoaded"
             @timeupdate="onAudioTimeUpdate"
-            @play="isPlaying = true"
+            @play="onAudioPlay"
             @ended="onAudioEnded"
-            @pause="isPlaying = false"
+            @pause="onAudioPause"
           />
           <div
             class="flex items-center gap-3 p-2 rounded-xl"
@@ -263,6 +265,10 @@ const messageStatus = computed(() => props.status);
 const messageProgress = computed(() => props.progress);
 const emit = defineEmits<Emits>();
 
+onUnmounted(() => {
+  stopProgressLoop()
+});
+
 const showMenu = ref(false);
 const menuBtnRef = ref<HTMLElement | null>(null);
 const menuPosition = ref({ top: 0, right: 0 });
@@ -294,40 +300,11 @@ const duration = ref("0:00");
 const progress = ref(0);
 const isPlaying = ref(false);
 
-const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"];
-const VIDEO_EXTENSIONS = ["mp4", "avi", "mov", "wmv", "flv", "webm", "mkv"];
-const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac"];
-
-const isImageFile = (ext: string | undefined) => ext ? IMAGE_EXTENSIONS.includes(ext.toLowerCase()) : false;
-const isVideoFile = (ext: string | undefined) => ext ? VIDEO_EXTENSIONS.includes(ext.toLowerCase()) : false;
-const isAudioFile = (ext: string | undefined) => ext ? AUDIO_EXTENSIONS.includes(ext.toLowerCase()) : false;
-
-const getFileIcon = (ext: string | undefined) => {
-  const iconMap: Record<string, string> = {
-    pdf: "ph-file-pdf", doc: "ph-file-text", docx: "ph-file-text",
-    xls: "ph-file-spreadsheet", xlsx: "ph-file-spreadsheet",
-    ppt: "ph-file-presentation", pptx: "ph-file-presentation",
-    jpg: "ph-image", webp: "ph-image", jpeg: "ph-image", png: "ph-image",
-    gif: "ph-image", svg: "ph-image", bmp: "ph-image",
-    mp3: "ph-music-note", wav: "ph-music-note", ogg: "ph-music-note",
-    m4a: "ph-music-note", aac: "ph-music-note", flac: "ph-music-note",
-    mp4: "ph-video", avi: "ph-video", mov: "ph-video",
-    wmv: "ph-video", webm: "ph-video", mkv: "ph-video",
-    zip: "ph-archive", rar: "ph-archive",
-  };
-  return (ext && iconMap[ext.toLowerCase()]) || "ph-file";
-};
-
-const getFileName = (filePath: string) => filePath.split("/").pop() || "file";
+import { isImageFile, isVideoFile, isAudioFile, getFileIcon, getFileName } from '../utils/fileType'
+import { formatDuration } from '../utils/format'
 
 const cancelMessageSend = () => {
   if (props.cancelTokenSource) props.cancelTokenSource.abort();
-};
-
-const formatDuration = (seconds: number) => {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
 const playAudio = (audioUrl: string) => {
@@ -341,7 +318,7 @@ const playAudio = (audioUrl: string) => {
 };
 
 const onAudioLoaded = () => {
-  if (audioPlayer.value) {
+  if (audioPlayer.value && isFinite(audioPlayer.value.duration) && audioPlayer.value.duration > 0) {
     duration.value = formatDuration(Math.floor(audioPlayer.value.duration));
   }
 };
@@ -351,12 +328,54 @@ const onAudioEnded = () => {
   if (audioPlayer.value) audioPlayer.value.currentTime = 0;
 };
 
+let rafId: number | null = null
+
+function startProgressLoop() {
+  const update = () => {
+    if (audioPlayer.value && isPlaying.value) {
+      const current = audioPlayer.value.currentTime
+      currentTime.value = formatDuration(Math.floor(current))
+      if (isFinite(audioPlayer.value.duration) && audioPlayer.value.duration > 0) {
+        const total = audioPlayer.value.duration
+        progress.value = (current / total) * 100
+      }
+    }
+    rafId = requestAnimationFrame(update)
+  }
+  rafId = requestAnimationFrame(update)
+}
+
+function stopProgressLoop() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
+}
+
 const onAudioTimeUpdate = () => {
   if (audioPlayer.value) {
     const current = Math.floor(audioPlayer.value.currentTime);
-    const total = Math.floor(audioPlayer.value.duration);
     currentTime.value = formatDuration(current);
-    progress.value = total > 0 ? (current / total) * 100 : 0;
+    if (isFinite(audioPlayer.value.duration) && audioPlayer.value.duration > 0) {
+      const total = Math.floor(audioPlayer.value.duration);
+      progress.value = total > 0 ? (current / total) * 100 : 0;
+    }
   }
 };
+
+const onDurationChange = () => {
+  if (audioPlayer.value && isFinite(audioPlayer.value.duration) && audioPlayer.value.duration > 0) {
+    duration.value = formatDuration(Math.floor(audioPlayer.value.duration));
+  }
+};
+
+const onAudioPlay = () => {
+  isPlaying.value = true
+  startProgressLoop()
+}
+
+const onAudioPause = () => {
+  isPlaying.value = false
+  stopProgressLoop()
+}
 </script>

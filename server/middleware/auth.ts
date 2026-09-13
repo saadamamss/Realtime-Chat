@@ -6,7 +6,6 @@ export default defineEventHandler(async (event) => {
   if (
     path === '/api/auth/login' ||
     path === '/api/auth/me' ||
-    path.startsWith('/api/files/') ||
     path.startsWith('/uploads/')
   ) {
     return

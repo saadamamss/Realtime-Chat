@@ -44,35 +44,30 @@ export interface ChatMessage {
   created_at_time: string
   progress?: number
   status?: 'sending' | 'sent' | 'failed'
+  conversation_id?: string
 }
 
 export interface ChatData {
   [date: string]: ChatMessage[]
 }
 
-export interface PendingMessage {
-  id: string
-  content: string
-  type: 'text' | 'file'
-  file?: File
-  filePreview?: FilePreview | null
-  timestamp: Date
-  direction: 'outbound'
-  status: 'sending' | 'sent' | 'failed'
-  progress?: number
-  requestId?: string
-}
-
-export interface MessageStatus {
-  requestId: string
-  status: 'sending' | 'sent' | 'failed'
-  progress?: number
-  error?: string
+export interface PendingUpload {
+  status: string
+  progress: number
+  cancelTokenSource: AbortController
+  file: File | null
 }
 
 export interface SocketMessage {
-  type: 'new-message' | 'joined' | 'user-joined' | 'user-left'
+  type: 'new-message' | 'delivery-update' | 'read-update' | 'message-deleted' | 'typing'
   conversation_id?: string
   message?: ChatMessage
-  user?: ChatUser
+  message_id?: string
+  user_id?: string
+}
+
+export interface WsTypingEvent {
+  type: 'typing'
+  conversation_id: string
+  user_id: string
 }

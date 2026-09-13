@@ -4,6 +4,8 @@
 .nuxt
 .nitro
 .cache
+.claude
+
 dist
 plans
 docs

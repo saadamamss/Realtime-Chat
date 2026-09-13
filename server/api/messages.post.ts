@@ -1,6 +1,5 @@
 import path from 'path'
 import fs from 'fs'
-import { v4 as uuid } from 'uuid'
 import { createMessage, addParticipant, getConversationParticipantIds, getDb, markDelivered, findUserById } from '../utils/db'
 import { broadcastToConversation, sendToUser, isUserSubscribed } from '../utils/ws'
 import { validate, messageContentSchema, sanitizeString } from '../utils/validation'
@@ -73,7 +72,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, message: 'File content does not match extension' })
       }
 
-      const filename = `${uuid()}${ext}`
+      const filename = `${crypto.randomUUID()}.${ext}`
       filePath = `/uploads/${filename}`
       await fs.promises.writeFile(path.join(UPLOAD_DIR, filename), part.data)
     }
@@ -87,7 +86,7 @@ export default defineEventHandler(async (event) => {
     userId,
     conversationId,
     sanitizeString(content),
-    filePath ? { url: filePath, ext: fileExt, size: fileSize } : undefined,
+    filePath ? { url: filePath, ext: filePath.split('.').pop() || fileExt, size: fileSize } : undefined,
     customRId || undefined,
     replyToRId || undefined,
   ) as any
@@ -116,13 +115,13 @@ export default defineEventHandler(async (event) => {
       image: user.avatar || '',
     },
     content: message.content,
-    file: message.file_url ? `/api/files${message.file_url}` : '',
+    file: message.file,
     file_extension: message.file_extension || '',
     file_size: message.file_size || undefined,
     reply_to: replyTo,
     read_at: message.read_at,
     created_at: message.created_at,
-    created_at_time: new Date(message.created_at).toLocaleTimeString('en-US', { hour12: false }).slice(0, 5),
+    created_at_time: message.created_at_time,
     status: 'sent' as const,
     delivered_at: null as string | null,
   }

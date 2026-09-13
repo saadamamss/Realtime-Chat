@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const loginSchema = z.object({
-  username: z.string().trim().min(1, 'Username is required').max(50).optional(),
+  username: z.string().trim().max(50).optional(),
   phone_number: z.string().trim().min(1, 'Phone number is required').max(20),
   password: z.string().min(6, 'Password must be at least 6 characters').max(100),
   mode: z.enum(['login', 'register']).default('login'),
