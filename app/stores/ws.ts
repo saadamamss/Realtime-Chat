@@ -1,6 +1,9 @@
-import { reactive } from 'vue'
+import { defineStore } from 'pinia'
 
-export default defineNuxtPlugin(() => {
+export const useWsStore = defineStore('ws', () => {
+  const connected = ref(false)
+  const onlineUsers = reactive<Set<string>>(new Set())
+
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
@@ -12,12 +15,6 @@ export default defineNuxtPlugin(() => {
 
   const BASE_DELAY = 1000
   const MAX_RECONNECT_DELAY = 30000
-
-  const state = reactive<{ connected: boolean }>({
-    connected: false,
-  })
-
-  const onlineUsers = reactive<Set<string>>(new Set())
 
   async function connect() {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
@@ -37,7 +34,7 @@ export default defineNuxtPlugin(() => {
     ws = new WebSocket(url)
 
     ws.onopen = () => {
-      state.connected = true
+      connected.value = true
       reconnectAttempts = 0
       if (currentToken) {
         send({ type: 'authenticate', token: currentToken })
@@ -76,7 +73,7 @@ export default defineNuxtPlugin(() => {
     }
 
     ws.onclose = () => {
-      state.connected = false
+      connected.value = false
       onlineUsers.clear()
       stopHeartbeat()
       scheduleReconnect()
@@ -123,6 +120,7 @@ export default defineNuxtPlugin(() => {
   function onMessage(callback: (data: any) => void) {
     messageHandlers.add(callback)
   }
+
   function offMessage(callback: (data: any) => void) {
     messageHandlers.delete(callback)
   }
@@ -156,25 +154,25 @@ export default defineNuxtPlugin(() => {
     ws = null
   }
 
+  function reset() {
+    disconnect()
+    connected.value = false
+    onlineUsers.clear()
+    reconnectAttempts = 0
+  }
+
   return {
-    provide: {
-      ws: {
-        get connected() {
-          return state.connected
-        },
-        get onlineUsers() {
-          return onlineUsers
-        },
-        connect,
-        disconnect,
-        send,
-        sendTyping,
-        onMessage,
-        offMessage,
-        joinConversation,
-        leaveConversation,
-        isOnline,
-      },
-    },
+    connected,
+    onlineUsers,
+    connect,
+    disconnect,
+    send,
+    sendTyping,
+    onMessage,
+    offMessage,
+    joinConversation,
+    leaveConversation,
+    isOnline,
+    reset,
   }
 })
