@@ -1,0 +1,23 @@
+services:
+  chat-app:
+    build: .
+    container_name: chat-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+    volumes:
+      - chat-data:/app/data
+      - chat-uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  chat-data:
+  chat-uploads:
