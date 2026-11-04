@@ -17,11 +17,12 @@ This phase focuses on replacing the SQLite database layer with Firestore, implem
 - [ Implement session management with Firebase Auth
 - [ ] Test authentication flow
 
-### 3.3 File Storage Migration
-- [ ] Migrate local file uploads to Firebase Storage
-- [ ] Update file handling in API routes
-- [ ] Implement file URL generation
-- [ ] Test file upload/download functionality
+### 3.3 File Storage Migration (Cloudinary)
+- [ ] Install Cloudinary SDK and configure credentials
+- [ ] Update file handling in API routes to use Cloudinary
+- [ ] Implement file URL generation with Cloudinary
+- [ ] Test file upload/download functionality with Cloudinary
+- [ ] Create Cloudinary upload presets for the chat app
 
 ### 3.4 Real-time Messaging System
 - [ ] Replace WebSocket system with Firestore listeners

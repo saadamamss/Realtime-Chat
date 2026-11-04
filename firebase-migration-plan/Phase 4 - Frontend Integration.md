@@ -23,6 +23,13 @@ This phase focuses on updating the frontend to use Firebase services, implementi
 - [ ] Implement typing indicators
 - [ ] Test real-time updates
 
+### 4.4 File Upload Integration (Cloudinary)
+- [ ] Install Cloudinary SDK in frontend
+- [ ] Update file upload component to use Cloudinary
+- [ ] Implement file preview functionality
+- [ ] Test file upload with progress indication
+- [ ] Handle Cloudinary error states
+
 ### 4.4 UI/UX Updates
 - [ ] Update UI components to work with Firebase data
 - [ ] Implement loading states and error handling
