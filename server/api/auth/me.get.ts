@@ -1,5 +1,5 @@
 import { getAuthTokenFromCookie, verifyToken } from '../../utils/auth'
-import { findUserById } from '../../utils/db'
+import { findUserById } from '../../lib/db-facade'
 
 export default defineEventHandler(async (event) => {
   const token = getAuthTokenFromCookie(event)
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'Invalid or expired session' })
   }
 
-  const user = findUserById(payload.userId)
+  const user = await findUserById(payload.userId)
   if (!user) {
     throw createError({ statusCode: 401, message: 'User not found' })
   }

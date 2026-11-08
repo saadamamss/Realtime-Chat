@@ -1,4 +1,4 @@
-import { findUserByPhoneNumber, createUser } from '../../utils/db'
+import { findUserByPhoneNumber, createUser } from '../../lib/db-facade'
 import { hashPassword, verifyPassword, signToken, setAuthCookie } from '../../utils/auth'
 import { loginSchema, validate, sanitizeString } from '../../utils/validation'
 
@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const input = validate(loginSchema, body)
 
   const trimmedPhone = input.phone_number.trim()
-  const existingUser = findUserByPhoneNumber(trimmedPhone)
+  const existingUser = await findUserByPhoneNumber(trimmedPhone)
 
   if (input.mode === 'register') {
     if (!input.username) {
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 409, message: 'Phone number already registered' })
     }
     const passwordHash = await hashPassword(input.password)
-    const user = createUser(sanitizeString(input.username), trimmedPhone, passwordHash)
+    const user = await createUser(sanitizeString(input.username), trimmedPhone, passwordHash)
     const token = await signToken({ userId: user.id })
     setAuthCookie(event, token)
     return { user }

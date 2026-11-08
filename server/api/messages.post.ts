@@ -1,6 +1,6 @@
 import path from 'path'
 import fs from 'fs'
-import { createMessage, addParticipant, getConversationParticipantIds, getDb, markDelivered, findUserById } from '../utils/db'
+import { createMessage, addParticipant, getConversationParticipantIds, markDelivered, findUserById, getMessageByRId } from '../lib/db-facade'
 import { broadcastToConversation, sendToUser, isUserSubscribed } from '../utils/ws'
 import { validate, messageContentSchema, sanitizeString } from '../utils/validation'
 
@@ -35,7 +35,7 @@ function validateFileContent(buffer: Buffer, ext: string): boolean {
 export default defineEventHandler(async (event) => {
   const userId = event.context.userId
 
-  const user = findUserById(userId)
+  const user = await findUserById(userId)
   if (!user) throw createError({ statusCode: 401, message: 'User not found' })
 
   const body = await readMultipartFormData(event)
@@ -80,9 +80,9 @@ export default defineEventHandler(async (event) => {
 
   if (!conversationId) throw createError({ statusCode: 400, message: 'conversation_id is required' })
 
-  addParticipant(conversationId, userId)
+  await addParticipant(conversationId, userId)
 
-  const message = createMessage(
+  const message = await createMessage(
     userId,
     conversationId,
     sanitizeString(content),
@@ -93,13 +93,7 @@ export default defineEventHandler(async (event) => {
 
   let replyTo
   if (replyToRId) {
-    const db = getDb()
-    const target = db.prepare(`
-      SELECT m.rId, m.content, m.sender_id, u.username as sender_name
-      FROM messages m
-      JOIN users u ON m.sender_id = u.id
-      WHERE m.rId = ?
-    `).get(replyToRId) as any
+    const target = await getMessageByRId(replyToRId)
     if (target) {
       replyTo = { rId: target.rId, sender: { id: target.sender_id, name: target.sender_name }, content: target.content }
     }
@@ -128,13 +122,13 @@ export default defineEventHandler(async (event) => {
 
   const payload = JSON.stringify({ type: 'new-message', message: formatted, conversation_id: conversationId })
   broadcastToConversation(conversationId, payload)
-  const participantIds = getConversationParticipantIds(conversationId)
+  const participantIds = await getConversationParticipantIds(conversationId)
   let delivered = false
   for (const pid of participantIds) {
     if (pid !== userId) {
       sendToUser(pid, payload)
       if (!delivered && isUserSubscribed(pid, conversationId)) {
-        markDelivered(message.rId)
+        await markDelivered(message.rId)
         delivered = true
       }
     }

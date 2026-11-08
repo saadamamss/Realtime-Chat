@@ -141,7 +141,7 @@ export const useRealtimeChat = () => {
       const userId = user.value?.uid
       if (!userId) throw new Error('User not authenticated')
 
-      await addDoc(collection(db, 'message_deletions', rId, 'deletions'), {
+      await setDoc(doc(db, 'message_deletions', rId, 'deletions', userId), {
         user_id: userId,
         created_at: serverTimestamp()
       })
