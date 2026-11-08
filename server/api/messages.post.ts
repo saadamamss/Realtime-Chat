@@ -1,6 +1,7 @@
 import path from 'path'
 import fs from 'fs'
-import { createMessage, addParticipant, getConversationParticipantIds, markDelivered, findUserById, getMessageByRId } from '../lib/db-facade'
+import { createMessage, addParticipant, getConversationParticipantIds, markDelivered, findUserById, getMessageByRId, isFirestore } from '../lib/db-facade'
+import { cloudinaryService } from '../utils/cloudinary'
 import { broadcastToConversation, sendToUser, isUserSubscribed } from '../utils/ws'
 import { validate, messageContentSchema, sanitizeString } from '../utils/validation'
 
@@ -72,9 +73,15 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, message: 'File content does not match extension' })
       }
 
-      const filename = `${crypto.randomUUID()}.${ext}`
-      filePath = `/uploads/${filename}`
-      await fs.promises.writeFile(path.join(UPLOAD_DIR, filename), part.data)
+      if (isFirestore) {
+        // Firestore build → files go to Cloudinary (permanent URL stored)
+        filePath = await cloudinaryService.uploadFile(part.data, `upload_${crypto.randomUUID()}.${ext}`, userId)
+      } else {
+        // SQLite build → files stay on local disk (original behavior)
+        const filename = `${crypto.randomUUID()}.${ext}`
+        filePath = `/uploads/${filename}`
+        await fs.promises.writeFile(path.join(UPLOAD_DIR, filename), part.data)
+      }
     }
   }
 

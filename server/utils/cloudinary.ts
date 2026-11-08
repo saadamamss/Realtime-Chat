@@ -1,5 +1,4 @@
 import { v2 as cloudinary } from 'cloudinary'
-import { ref } from 'firebase/storage'
 
 // Configure Cloudinary
 cloudinary.config({
@@ -23,46 +22,32 @@ export class CloudinaryService {
     return CloudinaryService.instance
   }
 
-  // Upload file to Cloudinary
+  // Upload a buffer to Cloudinary (resource_type auto covers images, video,
+  // audio and raw). Returns the permanent secure_url of the asset.
   async uploadFile(file: Buffer, filename: string, userId: string): Promise<string> {
     try {
-      // Extract file extension
-      const ext = filename.split('.').pop() || ''
-      
-      // Validate file type and size
+      // Extract file extension (no leading dot)
+      const ext = filename.split('.').pop()?.toLowerCase() || ''
       this.validateFile(file, ext)
       
-      const result = await this.cloudinary.uploader.upload_stream(
+      // Data-URI upload works for any buffer without temp files (verified
+      // pattern: cloudinary.uploader.upload in test-with-image.mjs)
+      const result = await this.cloudinary.uploader.upload(
+        `data:application/octet-stream;base64,${file.toString('base64')}`,
         {
           folder: `chat-app/${userId}`,
-          public_id: `${Date.now()}_${filename}`,
+          public_id: `${Date.now()}_${filename.replace(/[^\w.-]/g, '_')}`,
           resource_type: 'auto',
-          quality: 'auto',
-          format: 'auto'
-        },
-        (error, result) => {
-          if (error) throw error
-          return result.secure_url
         }
       )
-
-      // Convert buffer to stream and pipe to Cloudinary
-      const stream = require('stream')
-      const bufferStream = new stream.PassThrough()
-      bufferStream.end(file)
-      bufferStream.pipe(result)
-
-      return new Promise((resolve, reject) => {
-        result.on('error', reject)
-        result.on('end', () => resolve(result.secure_url))
-      })
+      return result.secure_url
     } catch (error) {
       console.error('Error uploading to Cloudinary:', error)
       throw error
     }
   }
 
-  // Delete file from Cloudinary
+  // Delete file from Cloudinary (needs the public id, not the URL)
   async deleteFile(publicId: string): Promise<void> {
     try {
       await this.cloudinary.uploader.destroy(publicId)

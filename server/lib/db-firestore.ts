@@ -36,7 +36,9 @@ function normalizeMessage(data: any): any {
       name: '',
       image: '',
     },
-    file: data.file ?? (data.file_url ? `/api/files${data.file_url}` : ''),
+    file: data.file ?? (data.file_url
+      ? (data.file_url.startsWith('http') ? data.file_url : `/api/files${data.file_url}`)
+      : ''),
     file_extension: data.file_extension ?? '',
     file_size: data.file_size || undefined,
     reply_to: data.reply_to,
