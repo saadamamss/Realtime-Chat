@@ -1,6 +1,7 @@
 // Simple Cloudinary integration test
 import cloudinary from 'cloudinary'
 import fs from 'fs'
+import 'dotenv/config'
 
 console.log('🧪 Testing Cloudinary Integration...\n')
 
@@ -28,10 +29,9 @@ console.log('📤 Testing basic Cloudinary connection...')
 
 try {
   // Test basic API call
-  const account = await cloudinary.api.account()
+  const ping = await cloudinary.api.ping()
   console.log('✅ Connected to Cloudinary!')
-  console.log('   Cloud Name:', account.cloud_name)
-  console.log('   Plan:', account.plan)
+  console.log('   Response:', ping.message || 'OK')
   
   // Create a test file
   const testContent = 'This is a test file for Cloudinary integration'

@@ -1,4 +1,4 @@
-import { CloudinaryService } from './server/utils/cloudinary.js'
+import { CloudinaryService } from './server/utils/cloudinary.ts'
 import fs from 'fs'
 import path from 'path'
 

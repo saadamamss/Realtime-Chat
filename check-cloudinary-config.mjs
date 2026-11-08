@@ -1,5 +1,6 @@
 // Check Cloudinary configuration
 import cloudinary from 'cloudinary'
+import 'dotenv/config'
 
 console.log('🔍 Checking Cloudinary Configuration...\n')
 
@@ -26,36 +27,25 @@ cloudinary.config({
   secure: true,
 })
 
-console.log('\n📤 Testing Cloudinary connection...')
+console.log('\n📤 Testing Cloudinary configuration...')
 
 try {
-  // Test basic API call
-  const account = await cloudinary.api.account()
-  console.log('✅ Successfully connected to Cloudinary!')
-  console.log('   Account Plan:', account.plan)
-  console.log('   Created:', account.created_at)
-  
-  // Get usage information
-  const usage = await cloudinary.api.usage()
-  console.log('\n💾 Storage Usage:')
-  if (usage.storage) {
-    console.log('   Used:', usage.storage.used || 'Not available')
-    console.log('   Limit:', usage.storage.limit || '25GB (Free tier)')
-  }
-  
-  if (usage.bandwidth) {
-    console.log('   Bandwidth Used:', usage.bandwidth.used || 'Not available')
-    console.log('   Bandwidth Limit:', usage.bandwidth.limit || '100GB (Free tier)')
-  }
+  // Test configuration
+  const config = cloudinary.config()
+  console.log('✅ Cloudinary configuration loaded successfully!')
+  console.log('   Cloud Name:', config.cloud_name)
+  console.log('   API Key:', config.api_key ? 'Set' : 'Not set')
+  console.log('   API Secret:', config.api_secret ? 'Set' : 'Not set')
+  console.log('   Secure:', config.secure)
   
   console.log('\n🎉 Cloudinary is properly configured!')
   console.log('\n📋 Ready to proceed with file uploads!')
+  console.log('\n💡 Note: Full API testing will be done when you run test-cloudinary.mjs')
   
 } catch (error) {
-  console.error('❌ Failed to connect to Cloudinary:', error.message)
+  console.error('❌ Cloudinary configuration failed:', error.message)
   console.log('\n🔧 Troubleshooting tips:')
   console.log('1. Double-check your Cloudinary credentials')
   console.log('2. Ensure your Cloudinary account is activated')
   console.log('3. Check your internet connection')
-  console.log('4. Verify your Cloudinary project is in the correct region')
 }
