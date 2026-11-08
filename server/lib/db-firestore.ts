@@ -673,14 +673,17 @@ export async function getMessages(conversationId: string, userId: string, page: 
   }
 }
 
-export async function deleteMessage(messageId: string, userId: string, mode: 'me' | 'all') {
+export async function deleteMessage(rId: string, userId: string, mode: 'me' | 'all') {
   try {
-    const messageDoc = await getDoc(doc(db, 'messages', messageId))
+    // SQLite matched by rId; message doc ids are UUIDs, so query by rId field
+    const q = query(collection(db, 'messages'), where('rId', '==', rId), limit(1))
+    const snap = await getDocs(q)
     
-    if (!messageDoc.exists()) {
+    if (snap.empty) {
       return null
     }
     
+    const messageDoc = snap.docs[0]
     const message = messageDoc.data()
     
     if (mode === 'all') {
@@ -689,7 +692,7 @@ export async function deleteMessage(messageId: string, userId: string, mode: 'me
         return null
       }
       
-      await deleteDoc(doc(db, 'messages', messageId))
+      await deleteDoc(messageDoc.ref)
       return message.conversation_id
     } else {
       // Soft delete for user
@@ -707,9 +710,13 @@ export async function deleteMessage(messageId: string, userId: string, mode: 'me
   }
 }
 
-export async function markDelivered(messageId: string) {
+export async function markDelivered(rId: string) {
   try {
-    await updateDoc(doc(db, 'messages', messageId), {
+    // SQLite matched by rId; message doc ids are UUIDs, so query by rId field
+    const q = query(collection(db, 'messages'), where('rId', '==', rId), limit(1))
+    const snap = await getDocs(q)
+    if (snap.empty) return
+    await updateDoc(snap.docs[0].ref, {
       delivered_at: serverTimestamp(),
       updated_at: serverTimestamp()
     })

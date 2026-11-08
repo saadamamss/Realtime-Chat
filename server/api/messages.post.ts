@@ -122,20 +122,25 @@ export default defineEventHandler(async (event) => {
 
   const payload = JSON.stringify({ type: 'new-message', message: formatted, conversation_id: conversationId })
   broadcastToConversation(conversationId, payload)
-  const participantIds = await getConversationParticipantIds(conversationId)
-  let delivered = false
-  for (const pid of participantIds) {
-    if (pid !== userId) {
-      sendToUser(pid, payload)
-      if (!delivered && isUserSubscribed(pid, conversationId)) {
-        await markDelivered(message.rId)
-        delivered = true
+  // Delivery marking must never turn a persisted, broadcast message into a 500
+  try {
+    const participantIds = await getConversationParticipantIds(conversationId)
+    let delivered = false
+    for (const pid of participantIds) {
+      if (pid !== userId) {
+        sendToUser(pid, payload)
+        if (!delivered && isUserSubscribed(pid, conversationId)) {
+          await markDelivered(message.rId)
+          delivered = true
+        }
       }
     }
-  }
-  if (delivered) {
-    formatted.delivered_at = new Date().toISOString()
-    sendToUser(userId, JSON.stringify({ type: 'delivery-update', message_id: message.rId, conversation_id: conversationId }))
+    if (delivered) {
+      formatted.delivered_at = new Date().toISOString()
+      sendToUser(userId, JSON.stringify({ type: 'delivery-update', message_id: message.rId, conversation_id: conversationId }))
+    }
+  } catch (err) {
+    console.error('delivery marking failed (message was still persisted):', err)
   }
 
   setResponseStatus(event, 201)
