@@ -134,15 +134,17 @@ chat-app/
 
 ---
 
-## 🔮 Coming Soon
+## 📋 Feature Roadmap
 
-- [ ] Proper authentication (password / OTP)
-- [ ] Group conversations
-- [ ] Message search
-- [ ] End-to-end encryption
-- [ ] Media gallery view
-- [ ] Push notifications
-- [ ] Tests (unit + integration)
+Detailed implementation plans for upcoming features:
+
+- [ ] **Message Search** ([Plans](plans/coming-soon/message-search.md)) - Full-text search across all messages
+- [ ] **Group Conversations** ([Plans](plans/coming-soon/group-conversations.md)) - Create and manage group chats
+- [ ] **Media Gallery** ([Plans](plans/coming-soon/media-gallery.md)) - Browse all media files in a dedicated gallery
+- [ ] **Push Notifications** ([Plans](plans/coming-soon/push-notifications.md)) - Real-time notifications across devices
+- [ ] **End-to-End Encryption** ([Plans](plans/coming-soon/end-to-end-encryption.md)) - Encrypted messaging
+
+See [Roadmap](plans/roadmap.md) for existing phases and [Coming Soon Plans](plans/coming-soon/) for detailed specifications.
 
 ---
 

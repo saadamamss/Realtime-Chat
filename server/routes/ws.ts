@@ -3,7 +3,7 @@ import {
   registerPeer, unregisterPeer, identifyPeer,
   subscribeToConversation, unsubscribeFromConversation, sendToUser,
 } from '../utils/ws'
-import { markRead, getConversationParticipantIds } from '../utils/db'
+import { markRead, getConversationParticipantIds } from '../lib/db-facade'
 import { verifyToken } from '../utils/auth'
 
 export default defineWebSocketHandler({
@@ -40,28 +40,32 @@ export default defineWebSocketHandler({
       } else if (data.type === 'leave' && data.conversationId) {
         unsubscribeFromConversation(peer, data.conversationId)
       } else if (data.type === 'messages-read' && data.conversation_id) {
-        const count = markRead(data.conversation_id, p.userId)
-        if (count > 0) {
+        void (async () => {
+          const count = await markRead(data.conversation_id, p.userId)
+          if (count > 0) {
+            const payload = JSON.stringify({
+              type: 'read-update',
+              conversation_id: data.conversation_id,
+              user_id: p.userId,
+            })
+            const pIds = await getConversationParticipantIds(data.conversation_id)
+            for (const pid of pIds) {
+              if (pid !== p.userId) sendToUser(pid, payload)
+            }
+          }
+        })().catch((err) => console.error('ws messages-read failed:', err))
+      } else if (data.type === 'typing' && data.conversation_id) {
+        void (async () => {
           const payload = JSON.stringify({
-            type: 'read-update',
+            type: 'typing',
             conversation_id: data.conversation_id,
             user_id: p.userId,
           })
-          const pIds = getConversationParticipantIds(data.conversation_id)
+          const pIds = await getConversationParticipantIds(data.conversation_id)
           for (const pid of pIds) {
             if (pid !== p.userId) sendToUser(pid, payload)
           }
-        }
-      } else if (data.type === 'typing' && data.conversation_id) {
-        const payload = JSON.stringify({
-          type: 'typing',
-          conversation_id: data.conversation_id,
-          user_id: p.userId,
-        })
-        const pIds = getConversationParticipantIds(data.conversation_id)
-        for (const pid of pIds) {
-          if (pid !== p.userId) sendToUser(pid, payload)
-        }
+        })().catch((err) => console.error('ws typing failed:', err))
       } else if (data.type === 'ping') {
         peer.send(JSON.stringify({ type: 'pong' }))
       }

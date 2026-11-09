@@ -1,6 +1,7 @@
 import path from 'path'
 import fs from 'fs'
-import { createMessage, addParticipant, getConversationParticipantIds, getDb, markDelivered, findUserById } from '../utils/db'
+import { createMessage, addParticipant, getConversationParticipantIds, markDelivered, findUserById, getMessageByRId, isFirestore } from '../lib/db-facade'
+import { cloudinaryService } from '../utils/cloudinary'
 import { broadcastToConversation, sendToUser, isUserSubscribed } from '../utils/ws'
 import { validate, messageContentSchema, sanitizeString } from '../utils/validation'
 
@@ -35,7 +36,7 @@ function validateFileContent(buffer: Buffer, ext: string): boolean {
 export default defineEventHandler(async (event) => {
   const userId = event.context.userId
 
-  const user = findUserById(userId)
+  const user = await findUserById(userId)
   if (!user) throw createError({ statusCode: 401, message: 'User not found' })
 
   const body = await readMultipartFormData(event)
@@ -72,17 +73,23 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, message: 'File content does not match extension' })
       }
 
-      const filename = `${crypto.randomUUID()}.${ext}`
-      filePath = `/uploads/${filename}`
-      await fs.promises.writeFile(path.join(UPLOAD_DIR, filename), part.data)
+      if (isFirestore) {
+        // Firestore build → files go to Cloudinary (permanent URL stored)
+        filePath = await cloudinaryService.uploadFile(part.data, `upload_${crypto.randomUUID()}.${ext}`, userId)
+      } else {
+        // SQLite build → files stay on local disk (original behavior)
+        const filename = `${crypto.randomUUID()}.${ext}`
+        filePath = `/uploads/${filename}`
+        await fs.promises.writeFile(path.join(UPLOAD_DIR, filename), part.data)
+      }
     }
   }
 
   if (!conversationId) throw createError({ statusCode: 400, message: 'conversation_id is required' })
 
-  addParticipant(conversationId, userId)
+  await addParticipant(conversationId, userId)
 
-  const message = createMessage(
+  const message = await createMessage(
     userId,
     conversationId,
     sanitizeString(content),
@@ -93,13 +100,7 @@ export default defineEventHandler(async (event) => {
 
   let replyTo
   if (replyToRId) {
-    const db = getDb()
-    const target = db.prepare(`
-      SELECT m.rId, m.content, m.sender_id, u.username as sender_name
-      FROM messages m
-      JOIN users u ON m.sender_id = u.id
-      WHERE m.rId = ?
-    `).get(replyToRId) as any
+    const target = await getMessageByRId(replyToRId)
     if (target) {
       replyTo = { rId: target.rId, sender: { id: target.sender_id, name: target.sender_name }, content: target.content }
     }
@@ -128,20 +129,25 @@ export default defineEventHandler(async (event) => {
 
   const payload = JSON.stringify({ type: 'new-message', message: formatted, conversation_id: conversationId })
   broadcastToConversation(conversationId, payload)
-  const participantIds = getConversationParticipantIds(conversationId)
-  let delivered = false
-  for (const pid of participantIds) {
-    if (pid !== userId) {
-      sendToUser(pid, payload)
-      if (!delivered && isUserSubscribed(pid, conversationId)) {
-        markDelivered(message.rId)
-        delivered = true
+  // Delivery marking must never turn a persisted, broadcast message into a 500
+  try {
+    const participantIds = await getConversationParticipantIds(conversationId)
+    let delivered = false
+    for (const pid of participantIds) {
+      if (pid !== userId) {
+        sendToUser(pid, payload)
+        if (!delivered && isUserSubscribed(pid, conversationId)) {
+          await markDelivered(message.rId)
+          delivered = true
+        }
       }
     }
-  }
-  if (delivered) {
-    formatted.delivered_at = new Date().toISOString()
-    sendToUser(userId, JSON.stringify({ type: 'delivery-update', message_id: message.rId, conversation_id: conversationId }))
+    if (delivered) {
+      formatted.delivered_at = new Date().toISOString()
+      sendToUser(userId, JSON.stringify({ type: 'delivery-update', message_id: message.rId, conversation_id: conversationId }))
+    }
+  } catch (err) {
+    console.error('delivery marking failed (message was still persisted):', err)
   }
 
   setResponseStatus(event, 201)

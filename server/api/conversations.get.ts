@@ -1,7 +1,7 @@
-import { getConversations } from '../utils/db'
+import { getConversations } from '../lib/db-facade'
 
 export default defineEventHandler(async (event) => {
   const userId = event.context.userId
-  const conversations = getConversations(userId)
+  const conversations = await getConversations(userId)
   return { conversations }
 })

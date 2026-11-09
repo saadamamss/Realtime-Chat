@@ -1,6 +1,6 @@
 import path from 'path'
 import fs from 'fs'
-import { isParticipant, getFileConversationId } from '../../utils/db'
+import { isParticipant, getFileConversationId } from '../../lib/db-facade'
 
 const UPLOAD_DIR = path.resolve(process.cwd(), 'data', 'uploads')
 
@@ -35,8 +35,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'File not found' })
   }
 
-  const conversationId = getFileConversationId(urlPath)
-  if (!conversationId || !isParticipant(conversationId, userId)) {
+  const conversationId = await getFileConversationId(urlPath)
+  if (!conversationId || !(await isParticipant(conversationId, userId))) {
     throw createError({ statusCode: 403, message: 'Access denied' })
   }
 
